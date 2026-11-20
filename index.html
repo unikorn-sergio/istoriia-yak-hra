@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Історія як гра</title>
+
+<!-- FOUC-guard. Копія docs/head-fragment.html — мусить бути інлайновим і
+     стояти ДО стилів, інакше темна тема блимає світлим (пастка N11). -->
+<script>
+  (function () {
+    'use strict';
+    try {
+      var root = document.documentElement;
+      if (localStorage.getItem('histgame_theme') === 'dark') {
+        root.setAttribute('data-theme-dark', '1');
+      }
+      var size = localStorage.getItem('histgame_fontsize');
+      if (size === 'lg') { root.classList.add('font-lg'); }
+      if (size === 'xl') { root.classList.add('font-xl'); }
+      if (localStorage.getItem('histgame_reducemotion') === '1') {
+        root.classList.add('reduce-motion');
+      }
+      if (localStorage.getItem('histgame_highcontrast') === '1') {
+        root.classList.add('high-contrast');
+      }
+    } catch (e) { /* приватний режим — лишаємо типову тему */ }
+  })();
+</script>
+
+<link rel="stylesheet" href="shared/css/reset.css">
+<link rel="stylesheet" href="shared/css/theme.css">
+<link rel="stylesheet" href="shared/css/puzzle.css">
+<link rel="stylesheet" href="shared/css/index.css">
+</head>
+
+<body data-nav="false" data-section="Головна">
+
+<main class="hub">
+
+  <header class="hub__header">
+    <div>
+      <h1 class="hub__title">Історія як гра</h1>
+      <p class="hub__subtitle">
+        Дев'ять періодів української історії. Кожна кнопка перевіряє одну
+        навичку з програми НМТ.
+      </p>
+    </div>
+
+    <div class="wallet">
+      <p class="wallet__label">Монети</p>
+      <p class="wallet__value" id="walletValue" role="status" aria-live="polite">0</p>
+      <p class="wallet__note" id="walletNote" hidden>
+        Сховище недоступне — покупки зникнуть після перезавантаження.
+      </p>
+    </div>
+  </header>
+
+  <!-- Наративні ігри. Розміткою вручну, а не через реєстр: реєстр описує
+       навички НМТ (`Mechanic:` вимог U##), а сторітелінг жодної не покриває —
+       запис туди зламав би tools/registry-validate.py. Та сама модель, що в
+       посилання на «Портрети» нижче. -->
+  <section class="hub__section">
+    <h2 class="hub__section-title">(не)історична історія</h2>
+    <div class="stories">
+      <a class="story" href="games/viraska.html">
+        <span class="story__title">Гетьманщина 1918</span>
+        <span class="story__hint">
+          Шлях Міри крізь три випробування · без балів і монет
+        </span>
+      </a>
+
+      <!-- Ланцюг із шести частин. Тут навмисно ОДНЕ посилання, а не шість:
+           наступна частина відкривається лише з кінця попередньої. -->
+      <a class="story" href="games/neistorychna-1.html">
+        <span class="story__title">Шість частин</span>
+        <span class="story__hint">
+          Семінари 11–33 · 78 завдань Wordwall · далі — з кінця частини
+        </span>
+      </a>
+    </div>
+  </section>
+
+  <section class="hub__section">
+    <h2 class="hub__section-title">Гра у грі</h2>
+    <div class="mini" id="miniGame"></div>
+    <p class="block__soon" style="margin-top: var(--space-sm);"
+       data-edition-needs="games/puzzle-hetmany.html">
+      Повна гра на три портрети:
+      <a href="games/puzzle-hetmany.html">Портрети</a>
+    </p>
+  </section>
+
+  <section class="hub__section">
+    <h2 class="hub__section-title">Періоди</h2>
+    <div class="blocks" id="blocks"></div>
+  </section>
+
+  <!-- Чекає на shared/js/analytics.js; доти лишається порожнім. -->
+  <section class="hub__section" id="analyticsSection" hidden>
+    <h2 class="hub__section-title">Мій архів</h2>
+    <div id="analyticsDashboard"></div>
+  </section>
+
+  <p class="hub__status" id="status" role="status" aria-live="polite" hidden></p>
+
+  <footer class="hub__footer">
+    <!-- «Вікторину без блоку» знято 2026-11-20: табу на вікторини. -->
+    <a href="docs/facts-format.md">Формат фактів</a>
+    <span id="coverage"></span>
+  </footer>
+
+</main>
+
+<!-- Порядок = граф залежностей (export.md B3). Підключено рівно те, що
+     сторінка вживає: адаптер і схема потрібні сторінці гри, не хабу. -->
+<script src="data/facts/_index.js"></script>
+<script src="data/program/blocks.js"></script>
+<script src="data/games-registry.js"></script>
+<script src="data/edition.js"></script>
+<script src="data/puzzles/hetmany.js"></script>
+<script src="shared/js/wallet.js"></script>
+<script src="shared/js/puzzle-engine.js"></script>
+<script src="shared/js/analytics.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  var INDEX = window.FACTS_INDEX || [];
+  var BLOCKS = window.BLOCKS || [];
+  var REGISTRY = window.GAMES_REGISTRY || [];
+  var FREE = window.GAMES_FREE || null;
+
+  var MECHANIC_LABELS = {
+    'timeline': 'хронологія',
+    'quiz-text': 'терміни',
+    'quote': 'джерела',
+    'map': 'картосхема',
+    'image': 'пам’ятки'
+  };
+
+  var topicsBySlug = {};
+  INDEX.forEach(function (topic) { topicsBySlug[topic.slug] = topic; });
+
+  /* --- видання ------------------------------------------------------------
+
+     data/edition.js каже, яке це видання: приватне (повне) чи публічне — те,
+     що tools/public-export.py збирає для хостингу лише з матеріалів без
+     чужого авторського права. hidden — префікси шляхів, яких у виданні немає;
+     посилання на них головна не показує, щоб не вести в порожнечу. */
+
+  var EDITION = window.HLG_EDITION || { name: 'private', hidden: [] };
+
+  function published(href) {
+    var path = String(href || '').split('?')[0];
+    for (var i = 0; i < EDITION.hidden.length; i++) {
+      if (path.indexOf(EDITION.hidden[i]) === 0) { return false; }
+    }
+    return true;
+  }
+
+  /* Статична розмітка: посилання й блоки з data-edition-needs. */
+  function applyEdition() {
+    [].forEach.call(document.querySelectorAll('[data-edition-needs]'), function (node) {
+      if (!published(node.getAttribute('data-edition-needs'))) { node.hidden = true; }
+    });
+    [].forEach.call(document.querySelectorAll('a[href]'), function (a) {
+      if (!published(a.getAttribute('href'))) { a.hidden = true; }
+    });
+  }
+
+  /* --- службове --------------------------------------------------------- */
+
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) { node.className = className; }
+    if (text !== undefined && text !== null) { node.textContent = String(text); }
+    return node;
+  }
+
+  var statusTimer = null;
+  function say(message) {
+    var box = document.getElementById('status');
+    box.textContent = message;
+    box.hidden = false;
+    if (statusTimer) { clearTimeout(statusTimer); }
+    statusTimer = setTimeout(function () { box.hidden = true; }, 6000);
+  }
+
+  function topicNumber(slug) {
+    return slug.split('-', 1)[0];
+  }
+
+  /* Українські числівники мають три форми, і «1 ігор» у продукті, чия мова
+     інтерфейсу українська (export.md B5), читається як недоробка.
+     forms = [1 гра, 2 гри, 5 ігор]. */
+  function plural(count, forms) {
+    var n = Math.abs(count) % 100;
+    var last = n % 10;
+    if (n > 10 && n < 20) { return forms[2]; }
+    if (last > 1 && last < 5) { return forms[1]; }
+    if (last === 1) { return forms[0]; }
+    return forms[2];
+  }
+
+  function counted(count, forms) {
+    return count + ' ' + plural(count, forms);
+  }
+
+  /* Чи має тема дані під цей шаблон кнопки. Та сама умова, що її перевіряє
+     tools/registry-validate.py — інакше сторінка й валідатор розійдуться. */
+  function satisfies(needs, topic) {
+    if (!needs || !topic) { return false; }
+    if (needs.renderable !== undefined && topic.renderable < needs.renderable) {
+      return false;
+    }
+    if (needs.quotes !== undefined && topic.quotes < needs.quotes) {
+      return false;
+    }
+    if (needs.type !== undefined) {
+      var have = (topic.types && topic.types[needs.type]) || 0;
+      if (have < (needs.min || 1)) { return false; }
+    }
+    return true;
+  }
+
+  function buttonId(topicSlug, template) {
+    return topicSlug + ':' + template.id;
+  }
+
+  function gameUrl(template, id, topicSlug) {
+    return template.url
+      .replace('{topic}', encodeURIComponent(topicSlug))
+      .replace('{id}', encodeURIComponent(id));
+  }
+
+  /* --- гаманець --------------------------------------------------------- */
+
+  function renderWallet() {
+    if (!window.HLGWallet) { return; }
+    document.getElementById('walletValue').textContent =
+      String(HLGWallet.getBalance());
+    document.getElementById('walletNote').hidden = HLGWallet.isPersistent();
+  }
+
+  /* --- прогрес ------------------------------------------------------------
+
+     Сітка опанування за Khan Academy (docs/design-references.md, висновок 3):
+     квадратик у кожній відкритій кнопці, рівень — найкращий результат із
+     HLGWallet.resultOf(). Пороги ті самі, що платять монети (plan1.md §5),
+     тож «зараховано» на головній і «+5 монет» у грі не розійдуться.
+     Колір ніколи не єдиний носій: стан пишеться словами в підписі під
+     темою й у title кнопки (plan1.md §9, «підписані словами»). */
+
+  var PASS_RATIO = 0.7;
+
+  function levelOf(result) {
+    if (!result || !result.bestTotal) { return null; }
+    var ratio = result.best / result.bestTotal;
+    if (ratio >= 1) { return { key: 'full', word: 'опановано' }; }
+    if (ratio >= PASS_RATIO) { return { key: 'pass', word: 'зараховано' }; }
+    return { key: 'try', word: 'ще не зараховано' };
+  }
+
+  function resultFor(id) {
+    return window.HLGWallet && HLGWallet.resultOf ? HLGWallet.resultOf(id) : null;
+  }
+
+  /* «Дати: 7/9, спроб 3» — формат plan1.md §5. Тема без жодної спроби
+     підпису не має: порожній рядок під кожною з 32 тем — це шум. */
+  /* games — [{id, title}]: повні id кнопок (той самий ключ, що в гаманці). */
+  function renderProgress(games) {
+    var box = el('p', 'topic__progress');
+    games.forEach(function (game) {
+      var result = resultFor(game.id);
+      var level = levelOf(result);
+      if (!level) { return; }
+      /* Рядок на гру: у вузькому блоці « · » рвав пару «назва: рахунок». */
+      box.appendChild(el('span', 'topic__progress-line',
+        game.title + ': ' + result.best + '/' + result.bestTotal
+        + ', ' + counted(result.attempts, ['спроба', 'спроби', 'спроб'])
+        + ' — ' + level.word));
+    });
+    return box.firstChild ? box : null;
+  }
+
+  /* --- кнопка ------------------------------------------------------------ */
+
+  /* Відкрита кнопка з квадратиком опанування. Спільна для шаблонів реєстру й
+     ігор тем (TOPIC_LINKS): учневі байдуже, звідки кнопка. */
+  function makeOpenButton(id, title, href, hint) {
+    var link = el('a', 'game');
+    link.href = href;
+    var level = levelOf(resultFor(id));
+    var mark = el('span', 'game__mark game__mark--' + (level ? level.key : 'none'));
+    mark.setAttribute('aria-hidden', 'true');
+    link.appendChild(mark);
+    link.appendChild(document.createTextNode(title));
+    link.title = (hint || title) + (level ? ' — ' + level.word : ' — ще не грали');
+    return link;
+  }
+
+  function makeGameButton(topicSlug, template) {
+    var id = buttonId(topicSlug, template);
+    var unlocked = window.HLGWallet ? HLGWallet.isUnlocked(id) : true;
+
+    if (unlocked) {
+      return makeOpenButton(id, template.title, gameUrl(template, id, topicSlug),
+                            template.hint);
+    }
+
+    var price = HLGWallet.priceOf(id);
+    var button = el('button', 'game game--locked');
+    button.type = 'button';
+    button.appendChild(document.createTextNode(template.title));
+    button.appendChild(el('span', 'game__price', '🔒 ' + price));
+    button.title = 'Відкрити за ' + price + ' монет: ' + (template.hint || template.title);
+
+    button.addEventListener('click', function () {
+      if (HLGWallet.unlock(id)) {
+        say('Відкрито: ' + template.title + '. Витрачено ' + price + ' монет.');
+        return; /* onChange перемалює сітку */
+      }
+      button.classList.remove('game--denied');
+      /* Перезапуск анімації: без reflow клас, доданий одразу після зняття,
+         не спрацьовує вдруге. */
+      void button.offsetWidth;
+      button.classList.add('game--denied');
+      say('Бракує монет: потрібно ' + price + ', є ' + HLGWallet.getBalance()
+          + '. Виграйте відкриту гру — перемога дає монети.');
+    });
+    return button;
+  }
+
+  /* --- блок -------------------------------------------------------------- */
+
+  /* Ігри теми поза реєстром. Реєстр розгортає шаблони навичок по темах, а
+     ці ігри мають авторський набір під одну тему, тож розгортати нічого.
+     Ключ — slug теми; id — той самий, що гра передає гаманцю й аналітиці
+     (?game=). Усі відкриті: після табу на вікторини (2026-11-20) замкнених
+     кнопок немає. */
+  var TOPIC_LINKS = {
+    '02-starodavnia-istoriia': [
+      { id: '02-starodavnia-istoriia:rozkopky', title: 'Розкопки',
+        href: 'games/rozkopky.html?game=02-starodavnia-istoriia:rozkopky',
+        hint: 'Розкопати ділянку й розкласти знахідки за археологічними культурами' }
+    ],
+    '03-rus-ukraina': [
+      { id: '03-rus-ukraina:kara-vikinha', title: 'Кара вікінга',
+        href: 'games/kara-vikinha.html?game=03-rus-ukraina:kara-vikinha',
+        hint: 'Ловити князів, суспільні групи й пам’ятки Русі за категоріями' }
+    ]
+  };
+
+  /* Окремі посилання в блоці — ігри поза реєстром (як «Портрети» вище):
+     вони не розгортаються по темах, тож ключ — slug блоку з blocks.tsv. */
+  var BLOCK_LINKS = {
+    kultura: [
+      { href: 'games/vidminnosti.html?pic=divchyna-z-podillia',
+        label: 'Відмінності', text: '«Дівчина з Поділля» В. Тропініна' }
+    ],
+    nezalezhnist: [
+      { href: 'games/kafe-na-hiltsi.html',
+        label: 'Кафе на гілці', text: 'страви «Характерного кафе»' },
+      { href: 'games/kafe-na-hiltsi.html?facts=30-vidnovlennia-nezalezhnosti,31-stanovlennia-nezalezhnoi-derzhavy,32-tvorennia-novoi-ukrainy',
+        label: 'Кафе на гілці', text: 'дати тем 30–32' }
+    ]
+  };
+
+  function renderBlockLinks(block) {
+    var links = (BLOCK_LINKS[block.slug] || []).filter(function (link) {
+      return published(link.href);
+    });
+    if (!links.length) { return null; }
+    var line = el('p', 'block__soon');
+    links.forEach(function (link, i) {
+      if (i) { line.appendChild(document.createTextNode(' · ')); }
+      line.appendChild(el('b', null, link.label + ': '));
+      var a = el('a', null, link.text);
+      a.href = link.href;
+      line.appendChild(a);
+    });
+    return line;
+  }
+
+  function renderBlock(block) {
+    var card = el('div', 'block');
+    card.style.setProperty('--block-bg', 'var(--block-' + block.block + '-bg)');
+
+    var head = el('div', 'block__head');
+    head.appendChild(el('span', 'block__num', block.block));
+    var titles = el('div');
+    titles.appendChild(el('h3', 'block__title', block.title));
+    titles.appendChild(el('p', 'block__range', block.range));
+    head.appendChild(titles);
+    card.appendChild(head);
+
+    var list = el('div', 'topics');
+    var totalFacts = 0;
+    var playable = 0;
+
+    block.topics.forEach(function (slug) {
+      var topic = topicsBySlug[slug];
+      if (!topic) { return; }
+      totalFacts += topic.facts;
+
+      var row = el('div', 'topic');
+      row.appendChild(el('span', 'topic__num', topicNumber(slug)));
+
+      var name = el('span', 'topic__name', topic.title);
+      name.title = topic.title;
+      row.appendChild(name);
+
+      var shown = [];
+      (TOPIC_LINKS[slug] || []).filter(function (game) {
+        return published(game.href);
+      }).forEach(function (game) {
+        row.appendChild(makeOpenButton(game.id, game.title, game.href, game.hint));
+        shown.push(game);
+      });
+      REGISTRY.forEach(function (template) {
+        if (template.status !== 'ready') { return; }
+        if (!satisfies(template.needs, topic)) { return; }
+        row.appendChild(makeGameButton(slug, template));
+        shown.push({ id: buttonId(slug, template), title: template.title });
+      });
+      var buttons = shown.length;
+      var progress = renderProgress(shown);
+      if (progress) { row.appendChild(progress); }
+
+      /* Тема без жодної кнопки — не помилка, а дірка покриття. Показуємо її,
+         а не ховаємо: саме так вчитель бачить, куди додавати факти. */
+      if (buttons === 0) {
+        row.appendChild(el('span', 'topic__empty',
+          topic.facts === 0 ? 'фактів ще немає' : 'ігор ще немає'));
+      }
+      playable += buttons;
+      list.appendChild(row);
+    });
+
+    card.appendChild(list);
+    var extra = renderBlockLinks(block);
+    if (extra) { card.appendChild(extra); }
+    card.appendChild(renderSoon(block));
+
+    card.appendChild(el('p', 'block__coverage',
+      counted(totalFacts, ['факт', 'факти', 'фактів'])
+      + ' у ' + counted(block.topics.length, ['темі', 'темах', 'темах'])
+      + ' · ' + counted(playable, ['гра', 'гри', 'ігор'])));
+    return card;
+  }
+
+  /* Планові механіки одним рядком, а не шістьма сірими прямокутниками: один
+     живий елемент серед шести мертвих читається як зламана сторінка. Ховати
+     їх теж не можна — це видимість покриття програми НМТ. */
+  function renderSoon(block) {
+    var mechanics = block.mechanics || [];
+    var noEngine = [];
+    var noData = [];
+
+    REGISTRY.forEach(function (template) {
+      if (template.status !== 'planned') { return; }
+      if (mechanics.indexOf(template.mechanic) === -1) { return; }
+      var label = MECHANIC_LABELS[template.mechanic] || template.title;
+      if (template.blocked === 'data') { noData.push(label); }
+      else { noEngine.push(label); }
+    });
+
+    var line = el('p', 'block__soon');
+    if (noEngine.length) {
+      line.appendChild(el('b', null, 'Скоро: '));
+      line.appendChild(document.createTextNode(noEngine.join(', ') + '. '));
+    }
+    if (noData.length) {
+      line.appendChild(el('b', null, 'Бракує фактів: '));
+      line.appendChild(document.createTextNode(noData.join(', ') + '.'));
+    }
+    return line;
+  }
+
+  function renderBlocks() {
+    var container = document.getElementById('blocks');
+    while (container.firstChild) { container.removeChild(container.firstChild); }
+
+    if (!BLOCKS.length) {
+      container.appendChild(el('p', 'topic__empty',
+        'Блоки не завантажено. Запустіть python tools/facts-build.py --all'));
+      return;
+    }
+    BLOCKS.forEach(function (block) {
+      container.appendChild(renderBlock(block));
+    });
+  }
+
+  /* --- покриття в підвалі ------------------------------------------------ */
+
+  function renderCoverage() {
+    var facts = 0;
+    INDEX.forEach(function (topic) { facts += topic.facts; });
+    document.getElementById('coverage').textContent =
+      counted(INDEX.length, ['тема', 'теми', 'тем']) + ' · '
+      + counted(facts, ['атомарний факт', 'атомарні факти', 'атомарних фактів']);
+  }
+
+  /* --- поле «Гра у грі» --------------------------------------------------
+
+     Пазл випадає у половині відкривань. Друга гілка НЕ повідомляє «не
+     пощастило» — вона показує факт із бази: обидві гілки мають щось давати. */
+
+  function mountMiniGame() {
+    var container = document.getElementById('miniGame');
+    var canPuzzle = window.PuzzleGame && window.PUZZLE_HETMANY;
+
+    if (canPuzzle && Math.random() < 0.5) {
+      PuzzleGame.init({
+        containerId: 'miniGame',
+        sets: window.PUZZLE_HETMANY.sets,
+        basePath: window.PUZZLE_HETMANY.basePath,
+        mode: 'compact',
+        onWin: function (set) {
+          if (window.HLGWallet) {
+            var gained = HLGWallet.award('puzzle-hetmany:' + set.id,
+                                         { won: true, once: true });
+            /* Нуль означає, що цей набір уже нагороджували: пазл дає монети
+               лише за перший виграш кожного портрета, інакше кнопки
+               купуються нескінченним перескладанням одного пазла. */
+            say(gained
+              ? 'Портрет зібрано: ' + set.name + '. +' + gained + ' монет.'
+              : 'Портрет зібрано: ' + set.name + '. Монети за нього вже отримано.');
+          }
+        }
+      });
+      return;
+    }
+    showRandomFact(container);
+  }
+
+  function showRandomFact(container) {
+    var pool = INDEX.filter(function (topic) { return topic.facts > 0; });
+    if (!pool.length) { return; }
+    var topic = pool[Math.floor(Math.random() * pool.length)];
+
+    /* Тема вантажиться інжекцією <script>, а не fetch: локальний fetch через
+       file:// блокує CORS (export.md B2). */
+    var loader = document.createElement('script');
+    loader.src = 'data/facts/' + topic.slug + '.js';
+    loader.onload = function () {
+      var all = (window.FACTS && window.FACTS[topic.slug])
+        ? window.FACTS[topic.slug].facts : [];
+      /* Незавершені записи відкидаємо так само, як їх відкидає адаптер:
+         «Собор — TODO» у полі «факт дня» виглядає як зламана сторінка, і
+         правильно виглядає — це недописаний факт, а не факт. */
+      var facts = all.filter(function (item) {
+        return item.object !== 'TODO' && item.fact.indexOf('TODO') === -1;
+      });
+      if (!facts.length) { return; }
+      var fact = facts[Math.floor(Math.random() * facts.length)];
+
+      var box = el('div', 'mini__fact');
+      box.appendChild(el('p', 'mini__fact-badge', 'Факт дня'));
+      box.appendChild(el('p', 'mini__fact-text', fact.fact));
+      box.appendChild(el('p', 'mini__fact-source', topic.title));
+      container.appendChild(box);
+    };
+    loader.onerror = function () {
+      container.appendChild(el('p', 'topic__empty',
+        'Не вдалося завантажити data/facts/' + topic.slug + '.js'));
+    };
+    document.head.appendChild(loader);
+  }
+
+  /* --- старт -------------------------------------------------------------- */
+
+  if (window.HLGWallet) {
+    HLGWallet.onChange(function () {
+      renderWallet();
+      renderBlocks();
+    });
+  }
+
+  renderWallet();
+  renderBlocks();
+  applyEdition();
+  renderCoverage();
+  mountMiniGame();
+
+  if (window.HLGAnalytics) {
+    document.getElementById('analyticsSection').hidden = false;
+    HLGAnalytics.renderDashboard('analyticsDashboard');
+  }
+})();
+</script>
+
+<!-- Коли з'являться — саме в цьому порядку (export.md E9):
+     nav.js -> analytics.js -> accessibility.js
+     accessibility.js очікує, що analytics.js уже завантажений. -->
+</body>
+</html>

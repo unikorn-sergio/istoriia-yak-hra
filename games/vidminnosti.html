@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Відмінності — Історія як гра</title>
+
+<!-- FOUC-guard. Копія docs/head-fragment.html — мусить бути інлайновим і
+     стояти ДО стилів, інакше темна тема блимає світлим (пастка N11). -->
+<script>
+  (function () {
+    'use strict';
+    try {
+      var root = document.documentElement;
+      if (localStorage.getItem('histgame_theme') === 'dark') {
+        root.setAttribute('data-theme-dark', '1');
+      }
+      var size = localStorage.getItem('histgame_fontsize');
+      if (size === 'lg') { root.classList.add('font-lg'); }
+      if (size === 'xl') { root.classList.add('font-xl'); }
+      if (localStorage.getItem('histgame_reducemotion') === '1') {
+        root.classList.add('reduce-motion');
+      }
+      if (localStorage.getItem('histgame_highcontrast') === '1') {
+        root.classList.add('high-contrast');
+      }
+    } catch (e) { /* приватний режим — лишаємо типову тему */ }
+  })();
+</script>
+
+<link rel="stylesheet" href="../shared/css/reset.css">
+<link rel="stylesheet" href="../shared/css/theme.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<style>
+  body {
+    --game-accent: var(--color-accent-1);
+    --vd-mark: var(--color-accent-3);
+  }
+
+  .page--vd { max-width: 84rem; }
+
+  .vd {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-md);
+  }
+
+  .vd-panel__label {
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-xs);
+  }
+
+  /* Рамка — це вікно, крізь яке видно картину. Чорний контур — з конституції головної. */
+  .vd-view {
+    position: relative;
+    height: min(68vh, 40rem);
+    overflow: hidden;
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-deep);
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .vd-view.is-dragging { cursor: grabbing; }
+  .vd-view:focus-visible {
+    outline: 3px solid var(--game-accent);
+    outline-offset: 2px;
+  }
+  /* Приціл у центрі рамки: з клавіатури Enter «клікає» саме сюди. */
+  .vd-view:focus-visible::after {
+    content: "";
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 28px; height: 28px;
+    margin: -14px 0 0 -14px;
+    border: 2px solid var(--game-accent);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .vd-scene {
+    position: absolute;
+    left: 0; top: 0;
+    will-change: transform;
+  }
+  .vd-scene img,
+  .vd-scene svg {
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    -webkit-user-drag: none;
+  }
+  .vd-scene img { image-rendering: auto; }
+
+  /* Латки підробки: власне місце й розмір, а не 100% сцени. */
+  .vd-scene img.vd-patch {
+    width: auto;
+    height: auto;
+  }
+
+  .vd-found {
+    fill: none;
+    stroke: var(--color-success);
+    stroke-width: 4;
+  }
+  /* Підказка пульсує; з .reduce-motion — просто пунктир без руху. */
+  /* Золото на олійному тлі губиться, тому контур двошаровий: темна облямівка
+     (drop-shadow) і яскрава пунктирна лінія. */
+  .vd-hint-ring {
+    fill: none;
+    stroke: #ffd23f;
+    stroke-width: 6;
+    stroke-dasharray: 14 8;
+    filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 2px #000);
+    animation: vd-pulse 0.7s ease-in-out infinite alternate;
+  }
+  @keyframes vd-pulse { from { opacity: 1; } to { opacity: 0.55; } }
+  .reduce-motion .vd-hint-ring { animation: none; }
+  @media (prefers-reduced-motion: reduce) { .vd-hint-ring { animation: none; } }
+  .button:disabled { opacity: 0.55; cursor: default; transform: none; filter: none; }
+
+  .vd-miss line {
+    stroke: var(--color-accent-3);
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+
+  .vd-score {
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    margin-left: auto;
+  }
+  .vd-score b {
+    font-size: var(--text-base);
+    color: var(--color-text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .vd-note,
+  .vd-finish {
+    margin-top: var(--space-md);
+    padding: var(--space-md);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-strong);
+    font-size: var(--text-base);
+  }
+  .vd-note__title { font-weight: 700; }
+  .vd-note__comment { margin-top: var(--space-xs); }
+  .vd-finish h2 { font-size: var(--text-lg); margin-bottom: var(--space-sm); }
+  .vd-finish dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--space-xs) var(--space-md);
+  }
+  .vd-finish dt { color: var(--color-text-secondary); }
+  .vd-finish dd { overflow-wrap: anywhere; }
+  .vd-finish p { margin-top: var(--space-sm); }
+  .vd-error { color: var(--color-accent-3); }
+
+  .vd-mark circle,
+  .vd-mark line {
+    fill: none;
+    stroke: var(--vd-mark);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+
+  .vd-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm);
+    margin: var(--space-md) 0 var(--space-sm);
+  }
+  .vd-zoom {
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    min-width: 5.5rem;
+  }
+  .vd-hint {
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    max-width: 60rem;
+  }
+
+  @media (max-width: 720px) {
+    .vd { grid-template-columns: 1fr; }
+    .vd-view { height: 40vh; }
+  }
+</style>
+</head>
+
+<body data-nav="overlay"
+      data-section="Ігри"
+      data-game-title="Відмінності"
+      data-home-url="../index.html">
+
+<main class="page page--vd">
+  <header class="page__header">
+    <h1 class="page__title" id="pageTitle">Знайди, що підробив копіїст</h1>
+    <p class="page__meta" id="pageMeta">Ліворуч оригінал, праворуч копія. Знайдіть усі зміни.</p>
+  </header>
+
+  <div class="vd-tools">
+    <button class="button button--compact" type="button" id="btnIn" aria-label="Збільшити">+</button>
+    <button class="button button--compact" type="button" id="btnOut" aria-label="Зменшити">−</button>
+    <button class="button button--compact button--quiet" type="button" id="btnFit">Уся картина</button>
+    <button class="button button--compact" type="button" id="btnHint">Підказка</button>
+    <button class="button button--compact button--quiet" type="button" id="btnFly" hidden>Наїзд до точки</button>
+    <span class="vd-zoom" id="zoomLabel" aria-live="off">×1,0</span>
+    <span class="vd-score" id="score">Знайдено <b id="found">0</b> · час <b id="timer">0:00</b></span>
+  </div>
+
+  <div class="vd">
+    <section class="vd-panel">
+      <h2 class="vd-panel__label" id="labelLeft">Оригінал</h2>
+      <div class="vd-view" id="viewLeft" tabindex="0" aria-labelledby="labelLeft">
+        <div class="vd-scene" id="sceneLeft"></div>
+      </div>
+    </section>
+    <section class="vd-panel">
+      <h2 class="vd-panel__label" id="labelRight">Копія</h2>
+      <div class="vd-view" id="viewRight" tabindex="0" aria-labelledby="labelRight">
+        <div class="vd-scene" id="sceneRight"></div>
+      </div>
+    </section>
+  </div>
+
+  <p class="status" id="status" role="status">Завантаження картини…</p>
+  <div class="vd-note" id="note" hidden></div>
+
+  <section class="vd-finish" id="finish" hidden aria-labelledby="finishTitle">
+    <h2 id="finishTitle">Усі зміни знайдено</h2>
+    <dl>
+      <div data-row hidden style="display:contents"><dt>Час</dt><dd data-f="time"></dd></div>
+      <div data-row hidden style="display:contents"><dt>Підказок</dt><dd data-f="hints"></dd></div>
+      <div data-row hidden style="display:contents"><dt>Картина</dt><dd data-f="title"></dd></div>
+      <div data-row hidden style="display:contents"><dt>Автор</dt><dd data-f="author"></dd></div>
+      <div data-row hidden style="display:contents"><dt>Рік</dt><dd data-f="year"></dd></div>
+      <div data-row hidden style="display:contents"><dt>Де створено</dt><dd data-f="created"></dd></div>
+      <div data-row hidden style="display:contents"><dt>Де зберігається</dt><dd data-f="place"></dd></div>
+      <div data-row hidden style="display:contents"><dt>Ліцензія</dt><dd data-f="license"></dd></div>
+      <div data-row hidden style="display:contents"><dt>Джерело файла</dt><dd data-f="source"></dd></div>
+    </dl>
+    <p data-row hidden><span data-f="description"></span></p>
+    <div class="actions">
+      <button class="button" type="button" id="btnAgain">Ще раз</button>
+      <a class="button button--quiet" href="../index.html">На головну</a>
+    </div>
+  </section>
+  <p class="vd-hint">Тягніть картину мишею або пальцем. Коліщатко чи два пальці — масштаб.
+    З клавіатури: стрілки, + і −, 0 — уся картина, Enter — клік у центрі рамки.
+    Обидві половини рухаються разом.</p>
+</main>
+
+<!-- «Архів»: візит сторінки й сесії гри (shared/js/analytics.js). -->
+<script src="../shared/js/analytics.js"></script>
+<script src="vidminnosti/pan-zoom.js"></script>
+<script src="vidminnosti/game.js"></script>
+<!-- Картини: по файлу на картину, збирає tools/vidminnosti-build.py. -->
+<script src="../data/vidminnosti/divchyna-z-podillia.js"></script>
+<script>
+  (function () {
+    'use strict';
+
+    /* Гра. ?pic=<slug> — картина з window.VIDMINNOSTI, типово перша.
+       З ?a= сторінка стає стендом (нижче), і гра не запускається. */
+    if (new URLSearchParams(location.search).get('a')) { return; }
+    var all = window.VIDMINNOSTI || {};
+    var slug = new URLSearchParams(location.search).get('pic');
+    var data = all[slug] || all[Object.keys(all)[0]];
+    if (!data) {
+      document.getElementById('status').textContent =
+        'Немає жодної картини: зберіть дані — python tools/vidminnosti-build.py --all';
+      return;
+    }
+    if (data.title) {
+      document.getElementById('pageMeta').textContent = '«' + data.title + '»' +
+        (data.author ? ', ' + data.author : '') +
+        '. Ліворуч оригінал, праворуч копія. Знайдіть усі ' + data.changes.length + ' змін.';
+    }
+    VidminnostiGame.init({
+      data: data,
+      ids: {
+        viewLeft: 'viewLeft', sceneLeft: 'sceneLeft',
+        viewRight: 'viewRight', sceneRight: 'sceneRight',
+        found: 'found', timer: 'timer', zoom: 'zoomLabel',
+        note: 'note', status: 'status', finish: 'finish',
+        btnIn: 'btnIn', btnOut: 'btnOut', btnFit: 'btnFit', btnAgain: 'btnAgain',
+        btnHint: 'btnHint'
+      }
+    }).then(function (api) { window.__vd = api; });   // для перевірки в DevTools
+  })();
+</script>
+<script>
+  (function () {
+    'use strict';
+
+    /* Стенд — лише з ?a=<шлях>[&b=<шлях>]: ліва половина a, права b (типово = a).
+       Шляхи лише відносні до цієї сторінки, напр.
+       vidminnosti.html?a=vidminnosti/assets/test-grid.png  — тестова сітка;
+       vidminnosti.html?a=../assets/vidminnosti/<slug>/original.png&b=…/edited.png */
+    if (!new URLSearchParams(location.search).get('a')) { return; }
+    document.getElementById('pageTitle').textContent = 'Відмінності: стенд перетягування';
+    document.getElementById('pageMeta').textContent =
+      'Стенд: клік ставить позначку на обох половинах і показує координати картини.';
+    document.getElementById('score').hidden = true;
+    document.getElementById('btnFly').hidden = false;
+    document.getElementById('btnHint').hidden = true;
+    var DEFAULT = 'vidminnosti/assets/test-grid.png';
+    var SVG = 'http://www.w3.org/2000/svg';
+    var marks = [];
+    var scale = 1;
+    var W = 0, H = 0;
+
+    var status = document.getElementById('status');
+    var zoomLabel = document.getElementById('zoomLabel');
+
+    function param(name) {
+      var v = new URLSearchParams(location.search).get(name);
+      /* Лише відносний шлях: стенд не тягне нічого з мережі й не приймає data:/javascript:. */
+      return v && !/^[a-z][a-z0-9+.-]*:|^\/\//i.test(v) ? v : null;
+    }
+    var srcA = param('a') || DEFAULT;
+    var srcB = param('b') || srcA;
+
+    function loadImage(src) {
+      return new Promise(function (resolve) {
+        var img = document.createElement('img');
+        img.alt = '';
+        img.draggable = false;
+        img.onload = function () { resolve(img); };
+        img.onerror = function () { resolve(null); };
+        img.src = src;
+      });
+    }
+
+    function mount(sceneId, img) {
+      var scene = document.getElementById(sceneId);
+      img.width = W;
+      img.height = H;
+      var svg = document.createElementNS(SVG, 'svg');
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      svg.setAttribute('aria-hidden', 'true');
+      scene.appendChild(img);
+      scene.appendChild(svg);
+      return svg;
+    }
+
+    var layers = [];
+
+    /* Позначка тримає однаковий розмір на екрані за будь-якого масштабу. */
+    function placeMark(m) {
+      m.g.forEach(function (g) {
+        g.setAttribute('transform', 'translate(' + m.x + ' ' + m.y + ') scale(' + (1 / scale) + ')');
+      });
+    }
+
+    function addMark(x, y) {
+      var m = { x: x, y: y, g: [] };
+      layers.forEach(function (svg) {
+        var g = document.createElementNS(SVG, 'g');
+        g.setAttribute('class', 'vd-mark');
+        var c = document.createElementNS(SVG, 'circle');
+        c.setAttribute('r', '14');
+        g.appendChild(c);
+        [[-8, 0, 8, 0], [0, -8, 0, 8]].forEach(function (l) {
+          var line = document.createElementNS(SVG, 'line');
+          line.setAttribute('x1', l[0]); line.setAttribute('y1', l[1]);
+          line.setAttribute('x2', l[2]); line.setAttribute('y2', l[3]);
+          g.appendChild(line);
+        });
+        svg.appendChild(g);
+        m.g.push(g);
+      });
+      marks.push(m);
+      if (marks.length > 12) {
+        marks.shift().g.forEach(function (g) { g.parentNode.removeChild(g); });
+      }
+      placeMark(m);
+    }
+
+    function fmt(n) { return n.toFixed(1).replace('.', ','); }
+
+    function onTap(x, y, how) {
+      addMark(x, y);
+      status.textContent = (how === 'key' ? 'Клік у центрі рамки' : 'Клік') +
+        ' у точці (' + Math.round(x) + ', ' + Math.round(y) + ') картини, масштаб ×' + fmt(scale) + '.';
+    }
+
+    function onChange(v) {
+      scale = v.scale;
+      zoomLabel.textContent = '×' + fmt(v.zoom);
+      marks.forEach(placeMark);
+    }
+
+    Promise.all([loadImage(srcA), loadImage(srcB)]).then(function (imgs) {
+      var a = imgs[0], b = imgs[1];
+      if (!a || !b) {
+        status.textContent = 'Не вдалося завантажити ' + (!a ? srcA : srcB) +
+          '. Перевірте шлях: він відносний до теки games/.';
+        return;
+      }
+      W = a.naturalWidth;
+      H = a.naturalHeight;
+      var note = '';
+      if (b.naturalWidth !== W || b.naturalHeight !== H) {
+        note = ' Увага: розміри різні — ' + W + ' × ' + H + ' і ' + b.naturalWidth + ' × ' +
+          b.naturalHeight + '. Латки з такої пари не виріжуться: копію треба робити на тому самому файлі без зміни розміру.';
+      }
+      layers = [mount('sceneLeft', a), mount('sceneRight', b)];
+
+      var common = { width: W, height: H, maxZoom: 6, onTap: onTap };
+      var left = PanZoom.create(Object.assign({
+        viewport: document.getElementById('viewLeft'),
+        content: document.getElementById('sceneLeft'),
+        onChange: onChange
+      }, common));
+      var right = PanZoom.create(Object.assign({
+        viewport: document.getElementById('viewRight'),
+        content: document.getElementById('sceneRight')
+      }, common));
+      PanZoom.link([left, right]);
+
+      status.textContent = 'Картина ' + W + ' × ' + H + ' px. Клікніть будь-де — позначка з\'явиться на обох половинах.' + note;
+
+      document.getElementById('btnIn').addEventListener('click', function () { left.zoomBy(1.25); });
+      document.getElementById('btnOut').addEventListener('click', function () { left.zoomBy(0.8); });
+      document.getElementById('btnFit').addEventListener('click', function () { left.fit({ animate: true }); });
+      document.getElementById('btnFly').addEventListener('click', function () {
+        left.setView({ zoom: 3, cx: W * 0.75, cy: H * 250 / 900 }, { animate: true });
+      });
+
+      window.__vd = { left: left, right: right };   // для перевірки зі стенда в DevTools
+    });
+  })();
+</script>
+</body>
+</html>

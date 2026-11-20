@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кафе на гілці — Історія як гра</title>
+
+<!-- FOUC-guard. Копія docs/head-fragment.html — мусить бути інлайновим і
+     стояти ДО стилів, інакше темна тема блимає світлим (пастка N11). -->
+<script>
+  (function () {
+    'use strict';
+    try {
+      var root = document.documentElement;
+      if (localStorage.getItem('histgame_theme') === 'dark') {
+        root.setAttribute('data-theme-dark', '1');
+      }
+      var size = localStorage.getItem('histgame_fontsize');
+      if (size === 'lg') { root.classList.add('font-lg'); }
+      if (size === 'xl') { root.classList.add('font-xl'); }
+      if (localStorage.getItem('histgame_reducemotion') === '1') {
+        root.classList.add('reduce-motion');
+      }
+      if (localStorage.getItem('histgame_highcontrast') === '1') {
+        root.classList.add('high-contrast');
+      }
+    } catch (e) { /* приватний режим — лишаємо типову тему */ }
+  })();
+</script>
+
+<link rel="stylesheet" href="../shared/css/reset.css">
+<link rel="stylesheet" href="../shared/css/theme.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<style>
+  /* Сцену малює рушій; усе довкола неї — через токени платформи. */
+  body {
+    --game-accent: var(--color-accent-3);
+  }
+
+  .page--kafe { max-width: 1280px; }
+
+  .kafe {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: var(--space-md);
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .kafe { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  .kafe-stage {
+    position: relative;
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--color-bg-raised);
+  }
+
+  .kafe-stage canvas { display: block; cursor: none; }
+  .kafe-stage[data-state="ready"] canvas,
+  .kafe-stage[data-state="paused"] canvas,
+  .kafe-stage[data-state="dayEnd"] canvas,
+  .kafe-stage[data-state="over"] canvas { cursor: default; filter: blur(1px); }
+
+  .kafe-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-md);
+    background: rgba(13, 17, 23, 0.35);
+  }
+
+  .kafe-overlay__card {
+    max-width: 34rem;
+    max-height: 100%;
+    overflow-y: auto;
+    padding: var(--space-md) var(--space-lg);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+    color: var(--color-text-primary);
+  }
+
+  .kafe-overlay__title { font-size: var(--text-xl); margin-bottom: var(--space-sm); }
+  .kafe-overlay__text { font-size: var(--text-base); margin-bottom: var(--space-sm); }
+  .kafe-overlay__buttons { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-sm); }
+
+  .kafe-rules { margin: 0 0 var(--space-sm) 1.1rem; font-size: var(--text-sm); }
+  .kafe-rules li { margin-bottom: var(--space-xs); list-style: disc; }
+
+  .kafe-stats { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--space-md); font-size: var(--text-sm); }
+  .kafe-stats dd { font-weight: 700; text-align: right; }
+
+  .kafe-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .kafe-box {
+    padding: var(--space-sm) var(--space-md);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-raised);
+  }
+
+  .kafe-box__title {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-xs);
+  }
+
+  .kafe-orders { display: flex; flex-direction: column; gap: var(--space-xs); }
+  .kafe-order {
+    padding: 0 0 var(--space-xs) var(--space-xs);
+    border-bottom: 1px solid var(--color-border);
+    border-left: 6px solid var(--recipe, var(--color-border-strong));
+  }
+
+  /* Книга рецептів. Колір рецепта задає --recipe на картці; той самий колір —
+     смуга на табличці клієнта в полі, тож замовлення й рецепт знаходяться
+     одне за одним. Фон — лише відтінок кольору, текст іде токенами теми. */
+  .kafe-book__list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    max-height: 26rem;
+    overflow-y: auto;
+  }
+  .recipe {
+    position: relative;
+    padding: var(--space-xs) var(--space-sm) var(--space-xs) calc(var(--space-sm) + 6px);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--recipe) 12%, transparent);
+  }
+  .recipe::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 6px;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    background: var(--recipe);
+  }
+  .recipe.is-ordered { border: 2px solid var(--recipe); }
+  .recipe__name { font-size: var(--text-sm); font-weight: 700; }
+  .recipe__tag {
+    display: inline-block;
+    margin-left: var(--space-xs);
+    padding: 0 var(--space-xs);
+    border-radius: var(--radius-full);
+    background: var(--recipe);
+    color: #ffffff;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    vertical-align: middle;
+  }
+  .recipe__items { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .recipe__item {
+    font-size: var(--text-xs);
+    padding: 1px var(--space-xs);
+    border: 1px solid var(--recipe);
+    border-radius: var(--radius-full);
+    background: var(--color-bg-raised);
+  }
+  .kafe-order:last-child { border-bottom: 0; padding-bottom: 0; }
+  .kafe-order__who { font-size: var(--text-xs); color: var(--color-text-secondary); }
+  .kafe-order__what { font-size: var(--text-sm); font-weight: 700; }
+  .kafe-order__bar { height: 6px; border-radius: var(--radius-full); background: var(--color-surface-strong); margin-top: 4px; overflow: hidden; }
+  .kafe-order__fill { height: 100%; background: var(--color-success); }
+  .kafe-order__fill[data-level="mid"] { background: var(--color-accent-1); }
+  .kafe-order__fill[data-level="low"] { background: var(--color-danger); }
+  .kafe-empty { font-size: var(--text-sm); color: var(--color-text-muted); }
+
+  .kafe-status {
+    min-height: 4.5em;
+    padding: var(--space-sm) var(--space-md);
+    border-left: 5px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    font-size: var(--text-sm);
+  }
+  .kafe-status[data-kind="ok"] { border-left-color: var(--color-success); }
+  .kafe-status[data-kind="bad"] { border-left-color: var(--color-danger); }
+  .kafe-status[data-kind="fact"] { border-left-color: var(--color-accent-1); font-weight: 600; }
+
+  .kafe-hud { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-xs); text-align: center; }
+  .kafe-hud__label { display: block; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .kafe-hud__value { font-size: var(--text-lg); font-weight: 700; }
+
+  .kafe-controls { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+  .kafe-hint { font-size: var(--text-xs); color: var(--color-text-muted); }
+</style>
+</head>
+<body data-nav="overlay"
+      data-section="Ігри"
+      data-game-title="Кафе на гілці"
+      data-home-url="../index.html">
+
+<main class="page page--kafe">
+  <header class="page__header">
+    <h1 class="page__title">Кафе на гілці</h1>
+    <p class="page__meta" id="meta">Ловіть інгредієнти й подавайте тому, хто їх замовив.</p>
+  </header>
+
+  <div id="errorSlot"></div>
+
+  <div class="kafe" id="game" hidden>
+    <section class="kafe-stage" id="stage" data-state="ready" aria-label="Ігрове поле">
+      <canvas id="field" width="960" height="780"></canvas>
+
+      <div class="kafe-overlay" id="ovStart">
+        <div class="kafe-overlay__card">
+          <h2 class="kafe-overlay__title">Кафе на гілці</h2>
+          <ul class="kafe-rules">
+            <li>Клієнти сідають на гілку. На табличці — замовлення, на шампурі — скільки шматків ще треба.</li>
+            <li>Кухар підкидає інгредієнти. Офіціант на скейті йде за мишею чи пальцем (також ← →) і ловить їх на тацю.</li>
+            <li>Клік, дотик, пробіл або ↑ — підкинути впійманий інгредієнт угору тому, хто під ним сидить.</li>
+            <li>Чужий інгредієнт клієнт не візьме й розсердиться. Не певні — загляньте в «Книгу рецептів»: колір рецепта той самий, що смуга на табличці клієнта.</li>
+            <li>Хмаринка темніє — терпіння спливає. Монети підбирайте, поки не прийшов злодій; на злодія можна наїхати.</li>
+          </ul>
+          <button class="button" id="startBtn" type="button">Відчинити кафе</button>
+        </div>
+      </div>
+
+      <div class="kafe-overlay" id="ovPause" hidden>
+        <div class="kafe-overlay__card">
+          <h2 class="kafe-overlay__title">Пауза</h2>
+          <div class="kafe-overlay__buttons">
+            <button class="button" id="resumeBtn" type="button">Продовжити</button>
+            <button class="button button--quiet" id="restartBtn2" type="button">Почати заново</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="kafe-overlay" id="ovDay" hidden>
+        <div class="kafe-overlay__card">
+          <h2 class="kafe-overlay__title" id="dayTitle"></h2>
+          <dl class="kafe-stats" id="dayStats"></dl>
+          <div class="kafe-overlay__buttons">
+            <button class="button" id="nextDayBtn" type="button">Наступний день</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="kafe-overlay" id="ovEnd" hidden>
+        <div class="kafe-overlay__card">
+          <h2 class="kafe-overlay__title" id="endTitle"></h2>
+          <p class="kafe-overlay__text" id="endText"></p>
+          <p class="kafe-overlay__text" id="endCoins"></p>
+          <div class="kafe-overlay__buttons">
+            <button class="button" id="againBtn" type="button">Грати знову</button>
+            <a class="button button--quiet" href="../index.html">На головну</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="kafe-panel" aria-label="Замовлення й рахунок">
+      <div class="kafe-box">
+        <p class="kafe-box__title">Замовлення на гілці</p>
+        <div class="kafe-orders" id="orders"><p class="kafe-empty">Поки нікого.</p></div>
+      </div>
+
+      <p class="kafe-status" id="status" role="status" data-kind="info"></p>
+
+      <section class="kafe-box kafe-book" aria-labelledby="bookTitle">
+        <p class="kafe-box__title" id="bookTitle">Книга рецептів</p>
+        <div class="kafe-book__list" id="book"></div>
+      </section>
+
+      <div class="kafe-box kafe-hud">
+        <div><span class="kafe-hud__label">День</span><span class="kafe-hud__value" id="day">1</span></div>
+        <div><span class="kafe-hud__label">Нагодовано</span><span class="kafe-hud__value" id="served">0</span></div>
+        <div><span class="kafe-hud__label">У касі</span><span class="kafe-hud__value" id="money">0</span></div>
+      </div>
+
+      <div class="kafe-controls">
+        <button class="button button--quiet" id="pauseBtn" type="button">Пауза</button>
+        <button class="button button--quiet" id="restartBtn" type="button">Заново</button>
+        <a class="button button--quiet" href="../index.html">На головну</a>
+      </div>
+      <p class="kafe-hint" id="setHint"></p>
+    </aside>
+  </div>
+</main>
+
+<!-- «Архів»: візит сторінки й сесії гри (shared/js/analytics.js). -->
+<script src="../shared/js/analytics.js"></script>
+<script src="../data/arcade/kafe-na-hiltsi.js"></script>
+<script src="../data/facts/_schema.js"></script>
+<script src="../data/facts/_templates.js"></script>
+<script src="../data/facts/_index.js"></script>
+<script src="../shared/js/facts-adapter.js"></script>
+<script src="../shared/js/wallet.js"></script>
+<script src="kafe-na-hiltsi/engine.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+  /* Імена клієнтів для набору з фактів — ті самі, що в «Характерному кафе». */
+  var NAMES = ['Пані Софія', 'Пан Богдан', 'Панна Оленка', 'Пан Тарас', 'Пані Леся',
+               'Пан Михайло', 'Панна Марія', 'Пан Іван', 'Пані Ганна', 'Пан Олександр'];
+  var TRAITS = [null, 'calm', null, 'hurry', 'generous'];
+
+  function param(name) {
+    var match = new RegExp('[?&]' + name + '=([^&]*)').exec(location.search);
+    return match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : null;
+  }
+
+  function $(id) { return document.getElementById(id); }
+
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) { node.className = cls; }
+    if (text !== undefined && text !== null) { node.textContent = text; }
+    return node;
+  }
+
+  function showError(title, lines) {
+    var box = el('div', 'error-box');
+    box.appendChild(el('p', null, title));
+    lines.forEach(function (line) {
+      var p = el('p');
+      p.appendChild(el('code', null, line));
+      box.appendChild(p);
+    });
+    $('errorSlot').appendChild(box);
+    $('meta').textContent = 'Не завантажено';
+  }
+
+  /* Кольори рецептів для набору з фактів. Добрані так, щоб сусідні
+     розрізнялися й на світлому, і на темному тлі; дальше — по колу. */
+  var PALETTE = ['#d4a017', '#30638e', '#e8702a', '#c1554a', '#6a4c93',
+                 '#2f8f4e', '#1b998b', '#b5179e', '#8d6e3f', '#4361ee'];
+
+  /* Авторський набір: страва = один крок із трьох інгредієнтів.
+     recipes — «Книга рецептів»: key збігається з label кроку, за ним
+     підсвічується рецепт, який зараз хтось замовив. */
+  function fromOwn(own) {
+    var byId = {};
+    own.dishes.forEach(function (d, i) {
+      byId[d.id] = d;
+      if (!d.color) { d.color = PALETTE[i % PALETTE.length]; }
+    });
+    return {
+      id: own.id,
+      title: own.title,
+      days: own.days,
+      recipes: own.dishes.map(function (d) {
+        return { key: d.name, name: (d.emoji ? d.emoji + ' ' : '') + d.name, color: d.color,
+                 items: d.ingredients.slice() };
+      }),
+      customers: own.customers.map(function (c) {
+        var d = byId[c.order];
+        return { name: c.name, trait: c.trait,
+                 steps: [{ label: d.name, emoji: d.emoji, color: d.color,
+                           need: d.ingredients.slice(), fact: d.fact }] };
+      })
+    };
+  }
+
+  /* Набір із фактів: пара «питання → дата» з FactsAdapter.toFalling().
+     Клієнт замовляє один-два кроки по одній відповіді. Відповіді в наборі
+     мусять бути різні: дві події з тією самою датою зробили б кидок
+     правильним для обох, і відмова була б несправедливою. */
+  function fromFacts(sets, seed) {
+    var seen = {};
+    var pairs = [];
+    var title = [];
+    sets.forEach(function (data) {
+      title.push(data.title);
+      data.questions.forEach(function (q) {
+        if (seen[q.answer]) { return; }
+        seen[q.answer] = true;
+        pairs.push(q);
+      });
+    });
+    var customers = [];
+    var recipes = [];
+    var i = 0, n = 0;
+    while (i < pairs.length) {
+      var take = (n % 3 === 2 && i + 1 < pairs.length) ? 2 : 1;
+      var steps = pairs.slice(i, i + take).map(function (q, j) {
+        var label = q.question.replace(/\s+—\s+якого року\?$/, '');
+        var color = PALETTE[(i + j) % PALETTE.length];
+        recipes.push({ key: label + ' — коли?', name: label, color: color, items: [q.answer] });
+        return { label: label + ' — коли?', color: color, need: [q.answer],
+                 fact: label + ' — ' + q.answer.replace(/\.$/, '') + '.' };
+      });
+      customers.push({ name: NAMES[n % NAMES.length], trait: TRAITS[n % TRAITS.length], steps: steps });
+      i += take;
+      n++;
+    }
+    var count = customers.length;
+    var d1 = Math.max(1, Math.round(count * 0.3));
+    var d2 = Math.max(1, Math.round(count * 0.3));
+    var days = [
+      { count: d1, perches: 2, patience: 45, tossEvery: 2.6, flight: 3.0, maxAir: 1, thief: 6 },
+      { count: d2, perches: 3, patience: 42, tossEvery: 2.0, flight: 2.6, maxAir: 1, thief: 5 },
+      { count: Math.max(1, count - d1 - d2), perches: 3, patience: 40, tossEvery: 1.7, flight: 2.3, maxAir: 1, thief: 4 }
+    ];
+    if (count < 3) { days = days.slice(0, count); }
+    return { title: title.join(' · '), days: days, customers: customers, recipes: recipes };
+  }
+
+  /* ?facts= приймає одну тему або кілька через кому — кафе блоку «Незалежність»
+     природно бере 30,31,32. Теми вантажаться <script src> по черзі, не fetch:
+     інакше не працюватиме з file:// (export.md B2). */
+  var factsParam = param('facts');
+  if (factsParam) {
+    var slugs = factsParam.split(',');
+    for (var k = 0; k < slugs.length; k++) {
+      if (!SLUG_RE.test(slugs[k])) { showError('Недопустима назва теми.', [String(slugs[k])]); return; }
+    }
+    var loaded = 0;
+    var failed = false;
+    slugs.forEach(function (slug) {
+      var loader = document.createElement('script');
+      loader.src = '../data/facts/' + slug + '.js';
+      loader.onload = function () {
+        loaded++;
+        if (loaded === slugs.length && !failed) { buildFromFacts(); }
+      };
+      loader.onerror = function () {
+        failed = true;
+        showError('Не знайдено файл теми.', ['data/facts/' + slug + '.js', 'python tools/facts-build.py --all']);
+      };
+      document.head.appendChild(loader);
+    });
+  } else {
+    start(fromOwn(window.KAFE_NA_HILTSI_DATA), null);
+  }
+
+  function buildFromFacts() {
+    var count = parseInt(param('count'), 10) || 8;
+    var sets = [];
+    slugs.forEach(function (slug) {
+      var data = window.FactsAdapter.toFalling(slug, {
+        count: count,
+        seed: param('seed'),
+        types: param('types') ? param('types').split(',') : ['DATE']
+      });
+      if (data && data.questions.length) { sets.push(data); }
+    });
+    if (!sets.length) {
+      showError('Адаптер не віддав жодної пари для цих тем. Подробиці — у консолі.', [
+        'python tools/facts-validate.py --all'
+      ]);
+      return;
+    }
+    var set = fromFacts(sets, param('seed'));
+    set.id = 'kafe-na-hiltsi:' + slugs.join('+');
+    start(set, slugs);
+  }
+
+  function start(set, slugs) {
+    var gameId = param('game') || set.id;
+    $('game').hidden = false;
+    $('meta').textContent = set.title + ' · клієнтів: ' + set.customers.length;
+    $('setHint').textContent = slugs
+      ? 'Набір зібрано з фактів теми. Інший набір — додайте до адреси &seed=<число>.'
+      : 'Авторський набір «Характерного кафе». Факти будь-якої теми: kafe-na-hiltsi.html?facts=<тема>[,<тема>].';
+
+    var stage = $('stage');
+
+    /* Книга рецептів: малюється раз, далі onOrders лише перемикає
+       is-ordered на рецептах, які зараз хтось замовив. */
+    var bookCards = {};
+    (function renderBook() {
+      var book = $('book');
+      while (book.firstChild) { book.removeChild(book.firstChild); }
+      (set.recipes || []).forEach(function (r) {
+        var card = el('div', 'recipe');
+        card.style.setProperty('--recipe', r.color);
+        var name = el('div', 'recipe__name', r.name);
+        card.appendChild(name);
+        var items = el('div', 'recipe__items');
+        r.items.forEach(function (it) { items.appendChild(el('span', 'recipe__item', it)); });
+        card.appendChild(items);
+        book.appendChild(card);
+        bookCards[r.key] = card;
+      });
+    })();
+
+    function markOrdered(list) {
+      var ordered = {};
+      list.forEach(function (o) { ordered[o.label] = true; });
+      Object.keys(bookCards).forEach(function (key) {
+        var card = bookCards[key];
+        var on = !!ordered[key];
+        if (card.classList.contains('is-ordered') === on) { return; }
+        card.classList.toggle('is-ordered', on);
+        var tag = card.querySelector('.recipe__tag');
+        if (on && !tag) { card.firstChild.appendChild(el('span', 'recipe__tag', 'замовлено')); }
+        if (!on && tag) { tag.parentNode.removeChild(tag); }
+      });
+    }
+
+    function overlay(which) {
+      $('ovStart').hidden = which !== 'start';
+      $('ovPause').hidden = which !== 'pause';
+      $('ovDay').hidden = which !== 'day';
+      $('ovEnd').hidden = which !== 'end';
+    }
+
+    function statRows(dl, rows) {
+      while (dl.firstChild) { dl.removeChild(dl.firstChild); }
+      rows.forEach(function (r) {
+        dl.appendChild(el('dt', null, r[0]));
+        dl.appendChild(el('dd', null, String(r[1])));
+      });
+    }
+
+    var game = window.KafeNaHiltsi.init({
+      canvasId: 'field',
+      customers: set.customers,
+      days: set.days,
+      seed: param('seed'),
+      moduleId: gameId,
+      onOrders: function (list) {
+        markOrdered(list);
+        var box = $('orders');
+        while (box.firstChild) { box.removeChild(box.firstChild); }
+        if (!list.length) { box.appendChild(el('p', 'kafe-empty', 'Поки нікого.')); return; }
+        list.forEach(function (o) {
+          var row = el('div', 'kafe-order');
+          if (o.color) { row.style.setProperty('--recipe', o.color); }
+          row.appendChild(el('div', 'kafe-order__who', o.name + ' · шампур ' + o.got + ' з ' + o.need));
+          row.appendChild(el('div', 'kafe-order__what', (o.emoji ? o.emoji + ' ' : '') + o.label));
+          var bar = el('div', 'kafe-order__bar');
+          var fill = el('div', 'kafe-order__fill');
+          fill.style.width = Math.round(o.patience * 100) + '%';
+          fill.setAttribute('data-level', o.patience > 0.6 ? 'high' : (o.patience > 0.3 ? 'mid' : 'low'));
+          bar.appendChild(fill);
+          row.appendChild(bar);
+          box.appendChild(row);
+        });
+      },
+      onStatus: function (text, kind) {
+        $('status').textContent = text;
+        $('status').setAttribute('data-kind', kind);
+      },
+      onHud: function (h) {
+        $('day').textContent = h.day + '/' + h.days;
+        $('served').textContent = h.served + '/' + h.total;
+        $('money').textContent = String(h.money);
+      },
+      onState: function (state) {
+        stage.setAttribute('data-state', state);
+        $('pauseBtn').textContent = state === 'paused' ? 'Продовжити' : 'Пауза';
+        if (state === 'paused') { overlay('pause'); }
+        else if (state === 'play') { overlay(null); }
+        else if (state === 'ready') { overlay('start'); }
+      },
+      onDayEnd: function (d) {
+        $('dayTitle').textContent = 'День ' + d.day + ' з ' + d.days + ' завершено';
+        statRows($('dayStats'), [
+          ['Нагодовано', d.served + ' з ' + d.count],
+          ['Пішли голодними', d.hungry],
+          ['Упущено потрібних інгредієнтів', d.dropped],
+          ['Монет у касі за день', d.earned],
+          ['Украдено монет', d.stolen]
+        ]);
+        overlay('day');
+        $('nextDayBtn').focus();
+      },
+      onEnd: function (r) {
+        var sec = Math.round(r.timeMs / 1000);
+        var share = r.total ? r.served / r.total : 0;
+        $('endTitle').textContent = share === 1 ? 'Усі нагодовані!' : 'Кафе зачиняється';
+        $('endText').textContent = 'Нагодовано ' + r.served + ' з ' + r.total + '. У касі: ' + r.money
+          + ' ₴. Хибних кидків: ' + r.mistakes + '. Час: '
+          + Math.floor(sec / 60) + ':' + ('0' + (sec % 60)).slice(-2) + '.';
+        /* Гаманець — під перевіркою, як скрізь (export.md E4), і нараховане
+           показуємо учневі: без цього монети «не приходять» (CLAUDE.md). */
+        var gained = window.HLGWallet ? HLGWallet.award(gameId, { score: r.served, total: r.total }) : 0;
+        $('endCoins').textContent = window.HLGWallet
+          ? (gained ? '+' + gained + ' монет на платформі.' : 'Монет не нараховано: потрібно нагодувати щонайменше 70 % клієнтів.')
+          : '';
+        overlay('end');
+        $('againBtn').focus();
+      }
+    });
+
+    $('startBtn').addEventListener('click', function () { game.start(); $('startBtn').blur(); });
+    $('resumeBtn').addEventListener('click', function () { game.resume(); });
+    $('nextDayBtn').addEventListener('click', function () { game.nextDay(); $('nextDayBtn').blur(); });
+    $('pauseBtn').addEventListener('click', function () {
+      if (game.state() === 'paused') { game.resume(); } else { game.pause(); }
+      $('pauseBtn').blur();
+    });
+    function again() { game.restart(); }
+    $('restartBtn').addEventListener('click', function () { again(); $('restartBtn').blur(); });
+    $('restartBtn2').addEventListener('click', again);
+    $('againBtn').addEventListener('click', function () { again(); $('againBtn').blur(); });
+
+    window.__kafe = game;
+  }
+})();
+</script>
+</body>
+</html>

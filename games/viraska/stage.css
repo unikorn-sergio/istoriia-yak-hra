@@ -1,0 +1,425 @@
+/* Стилі наративної гри «Гетьманщина 1918»: арена, сітка, спрайти.
+
+   Усі кольори через var(--color-*), тому темна тема працює без окремих
+   правил. Жодного font-size у px — лише var(--text-*), інакше перемикач
+   A/A+/A++ доступності нічого не зробить. Розміри спрайтів і клітинок у px
+   дозволені: це піксель-арт і сітка, а не текст. */
+
+/* --- режим арени -----------------------------------------------------------
+
+   Після старту сторінка перестає бути сторінкою: сцена займає весь екран,
+   а панель Wordwall стоїть по центру й лишається центром уваги. Рамки навколо
+   сцени немає навмисно — Міра ходить по всьому екрану, крім клітинок під
+   панеллю. */
+
+body.is-arena {
+  height: 100vh;
+  overflow: hidden;
+  background: var(--stage-tint, var(--color-bg-base));
+  transition: background var(--transition-slow);
+}
+
+body.is-arena .page__header,
+body.is-arena .viraska__hint {
+  display: none;
+}
+
+body.is-arena .page {
+  padding: 0;
+  max-width: none;
+}
+
+/* --- шар сцени -------------------------------------------------------------
+
+   Фіксований на весь екран і НЕ ловить кліки: під ним лежать кнопки. */
+
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base);
+}
+
+.stage.is-transit { opacity: 0; }
+
+.stage__layer {
+  position: absolute;
+  inset: 0;
+}
+
+/* Клітинка сітки. Малюються лише ВІЛЬНІ: під панеллю ходити нема де, і сітка
+   там була б лише шумом.
+
+   Заливка напівпрозора rgba(), а не color-mix(): без збірки не можна
+   покладатися на підтримку color-mix у всіх браузерах, а прозорість поверх
+   тла однаково працює і в світлій, і в темній темі. */
+.stage__cell {
+  position: absolute;
+  border: 1px solid rgba(20, 17, 15, 0.12);
+  background-repeat: no-repeat;
+  /* Плитки намальовані 128x128, клітинка — 152. Розтягуємо на всю клітинку,
+     щоб доріжка сходилася без щілин. image-rendering тут НЕ ставимо: 152/128 —
+     не ціле число, і pixelated дав би нерівні пікселі; плитки м'які, їм личить
+     згладжування. Спрайти свій pixelated зберігають. */
+  background-size: 100% 100%;
+  background-position: center bottom;
+}
+
+/* Колір зони — окремим шаром ПОВЕРХ плитки. Фоновий КОЛІР малюється під
+   фоновим ЗОБРАЖЕННЯМ, тому старим способом (background: rgba) зона під
+   травою просто зникла б. */
+.stage__cell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+/* Зона руху приглушена вдвічі проти колишньої: там, де лежить трава, зелень
+   поверх зелені читалася б як брудна пляма. */
+.stage__cell--walk::after  { background: rgba(47, 143, 78, 0.07); }
+.stage__cell--fight::after { background: rgba(90, 90, 90, 0.20); }   /* зона бою */
+.stage__cell--spawn::after { background: rgba(29, 122, 140, 0.18); } /* респавн */
+.stage__cell--end::after   { background: rgba(255, 255, 255, 0.55); }/* кінець */
+
+/* Місцевість. Клітинки коридору — тих, якими Міра справді йде: земля на рівних
+   відрізках, платформа там, де маршрут міняє рядок, тобто рівно там, де вона
+   стрибає. Плитку в inline-стилі ставить рушій (tileFor), а межу платформи
+   видно й без картинки — тому вона тут, а не в даних. */
+.stage__cell--platform {
+  border-color: rgba(20, 17, 15, 0.28);
+}
+
+/* Декор: камені на місці бою. Механіки не несе.
+   Прив'язка по низу-центру клітинки — та сама, що в акторів. */
+.stage__decor {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.stage__decor-img {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  max-width: none;
+  transform: translateX(-50%);
+  image-rendering: pixelated;
+  opacity: 0.9;
+}
+
+/* --- актори ---------------------------------------------------------------
+
+   Актор — точка «під ногами» в клітинці: нульовий розмір, позиція в пікселях
+   від рушія. Спрайт висить на ній низом-центром, тому кадри різного розміру
+   (enemy-attack 166x128, enemy-jump 151x145) не змушують персонажа
+   підстрибувати на зміні стану. */
+
+.stage__actor {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.stage__sprite {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  /* reset.css ставить усім зображенням max-width: 100%. Тут це 100% від
+     НУЛЬОВОЇ ширини актора, тобто нуль: спрайт зникав повністю, лишаючи саму
+     смугу здоров'я. Прив'язка по низу-центру вимагає нульового батька, тому
+     обмеження знімається тут, а не там. */
+  max-width: none;
+  transform: translateX(-50%);
+  transform-origin: bottom center;
+  image-rendering: pixelated;   /* без цього піксель-арт розмивається */
+}
+
+.stage__actor.is-flipped .stage__sprite {
+  transform: translateX(-50%) scaleX(-1);
+}
+
+/* Стріла. Прив'язка не по низу клітинки, а на висоті грудей (рушій додає
+   ARROW_LIFT): на рівні черевиків вона читалася б як щур, а не як постріл.
+   Дзеркалення те саме, що й у спрайтів — файл намальовано вістрям уліво. */
+.stage__arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.stage__arrow-img {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  max-width: none;
+  transform: translateX(-50%);
+  image-rendering: pixelated;
+}
+
+.stage__arrow.is-flipped .stage__arrow-img {
+  transform: translateX(-50%) scaleX(-1);
+}
+
+/* Відсутній актив мусить бути видимим і названим — те саме правило, що
+   `renderable` в адаптері фактів: краще видима порожнеча, ніж правдоподібна. */
+.stage__missing {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+  display: block;
+  min-width: 7rem;
+  padding: var(--space-xs);
+  background: #e00;
+  color: #fff;
+  font-size: var(--text-xs);
+  text-align: center;
+  border-radius: var(--radius-sm);
+}
+
+.stage__hp {
+  position: absolute;
+  left: 0;
+  bottom: 134px;                /* трохи вище за спрайт 128 px */
+  transform: translateX(-50%);
+  width: 44px;
+  height: 6px;
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-raised);
+  overflow: hidden;
+}
+
+.stage__hp-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--color-success);
+  transition: width var(--transition-fast);
+}
+
+.stage__hp--enemy .stage__hp-fill { background: var(--color-danger); }
+
+/* --- арена: панель завдання й керування ------------------------------------
+
+   Геометрію задає рушій (NarrativeStage.layoutPanel): блок приліплюється до
+   меж клітинок, інакше він стояв би на півклітинки й Міра або впиралася б у
+   порожнечу, або залазила б під нього. */
+
+/* Обстановка панелі стиснута навмисно. Панель уже максимально висока: MIN_RING
+   лишає Мірі рівно одну клітинку кільця згори й знизу, тож `reserve.h` більше
+   не дасть. Отже єдиний спосіб дати завданню місця — не витрачати його на
+   підписи, примітки й повітря. */
+.arena {
+  position: fixed;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  /* Панель приліплена до клітинок і вирости не може, тож зайвий вміст мусить
+     обрізатися, а не вилазити на сусідів. */
+  overflow: hidden;
+  border: var(--outline-width) solid var(--color-ink);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-raised);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Назва локації — орієнтир, а не оповідь. Тому дрібно й спокійно. */
+.arena__place {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  line-height: 1.1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* Думка, що долинула уривком. Не диктор: курсив і приглушений тон, щоб не
+   читалося як підпис до дії. Чия саме — каже data-who, який ставить рушій.
+   Рядок тут один і місце під нього тримається завжди: думки змінюються часто,
+   і панель не має підстрибувати щоразу. */
+.arena__story {
+  font-size: var(--text-sm);
+  line-height: 1.25;
+  font-style: italic;
+  color: var(--color-text-secondary);
+  text-align: center;
+  margin: 0;
+  min-height: 1.25em;
+}
+
+/* Ворожа думка холодніша й тихіша за Мірину — інакше їх не розрізнити. */
+.arena__story[data-who='skeleton'] {
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+/* --- смуга вікон Wordwall --------------------------------------------------
+
+   Усі завдання живуть на одній смузі й нікуди не переінжектяться: перехід —
+   це зсув смуги, а не знищення <iframe>. Раніше кожен перехід створював кадр
+   заново, і вже розпочате учнем завдання гинуло разом зі старим кадром. */
+
+.arena__strip {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.arena__track {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  /* Відсоток у translateY рахується від власної висоти доріжки, а вона
+     дорівнює висоті одного екрана — тому крок рівно на одне вікно. */
+  transform: translateY(0);
+  transition: transform var(--transition-slow);
+}
+
+/* В екрані лишився тільки кадр завдання — ні підпису, ні примітки. Тому й
+   gap тут нема чого розділяти. */
+.arena__screen {
+  flex: 0 0 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.task__slot {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Без резерву висоти: рядок порожній майже завжди, а місце тримав постійно.
+   Коли він таки з'являється, панель трохи підбирається — це помітно рівно
+   стільки, скільки треба, щоб на нього глянули. */
+.arena__wait {
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  color: var(--color-accent-3);
+  text-align: center;
+  min-height: 0;
+}
+
+.arena__wait:empty {
+  display: none;
+}
+
+/* Без min-height. Кадр бере рівно те, що лишила смуга: на вузькому вікні
+   мінімальна висота перемагала flex і примітка налазила на завдання. */
+.task__frame {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: var(--outline-width) solid var(--color-ink);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-raised);
+}
+
+.arena__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: center;
+  align-items: center;
+}
+
+/* Тісний екран (телефон): клітинок під сцену не лишається взагалі. Рушій
+   ховає сцену й вішає сюди is-cramped — сторінка стає звичайною, з гортанням
+   і панеллю завдання у потоці. Гра лишається прохідною, просто без Міри.
+   Видима межа краща за персонажа, який стоїть під панеллю й не рухається. */
+body.is-cramped {
+  height: auto;
+  overflow: auto;
+}
+
+body.is-cramped .arena {
+  position: static;
+  width: auto;
+  height: auto;
+  max-width: 40rem;
+  margin: var(--space-md) auto;
+}
+
+body.is-cramped .arena__strip {
+  overflow: visible;
+}
+
+body.is-cramped .arena__track {
+  position: static;
+  transform: none;
+}
+
+/* На телефоні смуга розгортається у звичайний список: усі завдання підряд,
+   гортанням. Прокручування мапи там сенсу не має — сцени однаково немає. */
+body.is-cramped .arena__screen {
+  flex: 0 0 auto;
+  margin-bottom: var(--space-lg);
+}
+
+body.is-cramped .task__frame {
+  height: 60vh;
+}
+
+/* --- екран підготовки (до старту) ------------------------------------------ */
+
+.viraska__hint {
+  max-width: 34rem;
+  margin: 0 auto var(--space-md);
+  text-align: left;
+}
+
+.viraska__hint li {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  padding: var(--space-xs) 0;
+}
+
+.viraska__hint li::before {
+  content: '▸ ';
+  color: var(--game-accent);
+}
+
+/* Перемикач «проходити завдання чи ні» — головний вибір, який дає гра. */
+.choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: center;
+  margin: var(--space-md) 0;
+}
+
+.choice__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border: var(--outline-width) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-raised);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.choice__option[aria-pressed='true'] {
+  border-color: var(--color-ink);
+  background: var(--game-accent);
+  color: var(--color-text-inverse);
+}
+
+/* Рух вимкнено — прибираємо власні переходи. Самі .gif зупинити неможливо:
+   статичних PNG для них не намальовано (є лише enemy-dead.png). Це межа
+   формату, і вона названа вголос, а не замовчана. */
+.reduce-motion .stage,
+.reduce-motion body.is-arena,
+.reduce-motion .arena__track,
+.reduce-motion .stage__hp-fill {
+  transition: none;
+}

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Гетьманщина 1918 — Історія як гра</title>
+
+<!-- FOUC-guard. Копія docs/head-fragment.html — мусить бути інлайновим і
+     стояти ДО стилів, інакше темна тема блимає світлим (пастка N11).
+     Це ЧЕТВЕРТА копія: index.html, games/facts-quiz.html,
+     games/puzzle-hetmany.html і ця. Змінюєте фрагмент — змінюйте всі. -->
+<script>
+  (function () {
+    'use strict';
+    try {
+      var root = document.documentElement;
+      if (localStorage.getItem('histgame_theme') === 'dark') {
+        root.setAttribute('data-theme-dark', '1');
+      }
+      var size = localStorage.getItem('histgame_fontsize');
+      if (size === 'lg') { root.classList.add('font-lg'); }
+      if (size === 'xl') { root.classList.add('font-xl'); }
+      if (localStorage.getItem('histgame_reducemotion') === '1') {
+        root.classList.add('reduce-motion');
+      }
+      if (localStorage.getItem('histgame_highcontrast') === '1') {
+        root.classList.add('high-contrast');
+      }
+    } catch (e) { /* приватний режим — лишаємо типову тему */ }
+  })();
+</script>
+
+<link rel="stylesheet" href="../shared/css/reset.css">
+<link rel="stylesheet" href="../shared/css/theme.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<link rel="stylesheet" href="viraska/stage.css">
+<style>
+  /* Сторінка гри перевизначає акцент — і отримує свій характер, не ламаючи
+     систему (export.md H). Оголошення на body, а не :root: теми
+     перевизначають --gradient-page саме на body. */
+  body {
+    --game-accent: var(--color-accent-2);
+  }
+  .page--game {
+    max-width: 64rem;
+    text-align: center;
+  }
+</style>
+</head>
+
+<body data-nav="overlay"
+      data-section="Ігри"
+      data-game-title="Гетьманщина 1918"
+      data-home-url="../index.html">
+
+<main class="page page--game viraska">
+  <header class="page__header">
+    <h1 class="page__title">Гетьманщина 1918</h1>
+    <p class="page__meta">
+      Шлях Міри крізь три випробування. Ця гра нічого не оцінює й не платить
+      монет — вона розповідає, а не перевіряє.
+    </p>
+  </header>
+
+  <div id="intro">
+    <ul class="viraska__hint">
+      <li>Міра йде сама: доріжку, бої та відступи веде її власний ШІ</li>
+      <li>Екран розбитий на клітинки — вона ходить по них і обходить завдання</li>
+      <li>Ворог стереже свій пост і за межі своєї ділянки не женеться</li>
+      <li>Кнопка «Продовжити шлях» веде історію далі будь-якої миті</li>
+      <li>Впасти можна, застрягти — ні: збита Міра повзе до синьої зони,
+        лікується там і повертається з луком</li>
+      <li>Завдання — з Wordwall: результат сюди не повертається й на шлях Міри
+        не впливає</li>
+    </ul>
+
+    <p class="page__meta" id="choiceLabel">Як проходити?</p>
+    <div class="choice" role="group" aria-labelledby="choiceLabel">
+      <button type="button" class="choice__option" id="modeTasks" aria-pressed="true">
+        Історія із завданнями
+      </button>
+      <button type="button" class="choice__option" id="modeStory" aria-pressed="false">
+        Тільки історія
+      </button>
+    </div>
+
+    <button type="button" class="button" id="startBtn">Почати шлях</button>
+  </div>
+
+  <!-- Шар сцени: рушій кладе сюди сітку й акторів. Рамки немає навмисно. -->
+  <div id="stage"></div>
+
+  <!-- Зарезервований блок. Його геометрію задає рушій за сіткою, тому Міра
+       фізично не може зайти в ці клітинки, і панель лишається центром уваги. -->
+  <div class="arena" id="arena" hidden>
+    <!-- Смуга вікон Wordwall: усі завдання на одній доріжці, перехід —
+         прокручування, а не перестворення кадра. Екрани будує скрипт із
+         VIRASKA_DATA, щоб додана локація не вимагала правити розмітку. -->
+    <div class="arena__strip" id="strip" hidden>
+      <div class="arena__track" id="track"></div>
+    </div>
+
+    <p class="arena__place" id="placeName"></p>
+    <!-- Не диктор, а думка, що долинула уривком: чия саме — каже data-who. -->
+    <p class="arena__story" id="stageStatus" role="status" aria-live="polite"></p>
+    <p class="arena__wait" id="waitLine" role="status" aria-live="polite"></p>
+
+    <div class="arena__controls" id="controls" hidden>
+      <button type="button" class="button button--compact" id="nextBtn">Продовжити шлях</button>
+      <a class="button button--quiet button--compact" href="../index.html">На головну</a>
+    </div>
+  </div>
+</main>
+
+<!-- Порядок = граф залежностей (export.md B3). -->
+<!-- «Архів»: візит сторінки й сесії гри (shared/js/analytics.js). -->
+<script src="../shared/js/analytics.js"></script>
+<script src="../data/narrative/viraska.js"></script>
+<script src="viraska/stage.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  var STORE_KEY = 'histgame_viraska';
+
+  var intro = document.getElementById('intro');
+  var arena = document.getElementById('arena');
+  var strip = document.getElementById('strip');
+  var track = document.getElementById('track');
+  var controls = document.getElementById('controls');
+  var nextBtn = document.getElementById('nextBtn');
+  var waitLine = document.getElementById('waitLine');
+  var placeName = document.getElementById('placeName');
+  var modeTasks = document.getElementById('modeTasks');
+  var modeStory = document.getElementById('modeStory');
+
+  var withTasks = true;
+  var screens = [];            /* по одному екрану на локацію */
+  var currentIndex = 0;
+
+  /* --- сховище ------------------------------------------------------------
+     Кожен доступ у try/catch: приватний режим кидає виняток на самому
+     читанні, і гра має це пережити — так само, як wallet.js. */
+
+  function loadChoice() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) { return; }
+      var saved = JSON.parse(raw);
+      if (saved && typeof saved.withTasks === 'boolean') {
+        withTasks = saved.withTasks;
+      }
+    } catch (e) { /* лишаємо типовий вибір */ }
+  }
+
+  function saveChoice() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({ withTasks: withTasks }));
+    } catch (e) { /* вибір проживе лише до перезавантаження */ }
+  }
+
+  /* --- службове ------------------------------------------------------------ */
+
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) { node.className = className; }
+    if (text !== undefined && text !== null) { node.textContent = String(text); }
+    return node;
+  }
+
+  function clear(node) {
+    while (node.firstChild) { node.removeChild(node.firstChild); }
+  }
+
+  /* --- панель завдання -----------------------------------------------------
+
+     Жодної перевірки протоколу. Стара гра глушила себе рядком
+     `window.location.protocol === 'file:'` — і учень, який відкрив теку з
+     флешки МАЮЧИ інтернет, бачив «Потрібне підключення». <iframe> на
+     абсолютний https вантажиться і зі сторінки file://. */
+
+  /* Екран на локацію. Створюються всі одразу — це і є «всі вікна на одній
+     сторінці»; а от <iframe> у них монтується ліниво, бо три чужі сторінки
+     в пам'яті одночасно з першої секунди платити не хочеться.
+
+     В екрані немає нічого, крім самого кадра. Підпис завдання дублював назву
+     локації над панеллю й заголовок самого кадра, а примітка про Wordwall
+     потрібна один раз, а не на кожному з трьох екранів — вона переїхала у
+     вступний список. Панель мала й лишається максимально високою (MIN_RING
+     не дає взяти більше клітинок), тому єдиний спосіб дати завданню місця —
+     не займати його нічим іншим. */
+  function buildScreens(locations) {
+    clear(track);
+    screens = [];
+    locations.forEach(function (location) {
+      var node = el('section', 'arena__screen');
+      var slot = el('div', 'task__slot');
+      node.appendChild(slot);
+      track.appendChild(node);
+      screens.push({ slot: slot, task: location.task || null, timer: null,
+                     mounted: false });
+    });
+  }
+
+  function mountFrame(screen) {
+    if (!screen || !screen.task) { return; }
+    screen.mounted = true;
+    clear(screen.slot);
+    if (screen.timer) { clearTimeout(screen.timer); screen.timer = null; }
+
+    if (navigator.onLine === false) {
+      showOffline(screen);
+      return;
+    }
+
+    var frame = document.createElement('iframe');
+    frame.className = 'task__frame';
+    frame.title = screen.task.label + ' — завдання на сайті Wordwall';
+    frame.setAttribute('referrerpolicy', 'no-referrer');
+    frame.setAttribute('allowfullscreen', '');
+    frame.src = screen.task.embed;
+
+    /* Другий сигнал, окрім navigator.onLine: мережа є, але Wordwall мовчить.
+       onload знімає таймер; спрацював таймер — показуємо заглушку. */
+    frame.addEventListener('load', function () {
+      if (screen.timer) { clearTimeout(screen.timer); screen.timer = null; }
+    });
+
+    screen.slot.appendChild(frame);
+    screen.timer = window.setTimeout(function () {
+      screen.timer = null;
+      showOffline(screen);
+    }, 8000);
+  }
+
+  function showOffline(screen) {
+    clear(screen.slot);
+    var box = el('div', 'error-box');
+    box.appendChild(el('p', null,
+      'Завдання потребує інтернету. Шлях Міри це не зупиняє — '
+      + 'тисніть «Продовжити шлях».'));
+    var retry = el('button', 'button button--quiet', 'Спробувати ще раз');
+    retry.type = 'button';
+    retry.addEventListener('click', function () { mountFrame(screen); });
+    box.appendChild(retry);
+    screen.slot.appendChild(box);
+  }
+
+  window.addEventListener('online', function () {
+    if (!withTasks) { return; }
+    screens.forEach(function (screen) {
+      if (screen.mounted) { mountFrame(screen); }
+    });
+  });
+
+  /* --- перебіг гри --------------------------------------------------------- */
+
+  function onArrive(location, index) {
+    currentIndex = index;
+    nextBtn.textContent = location.next || 'Продовжити шлях';
+    controls.hidden = false;
+    placeName.textContent = location.name || '';
+
+    if (!withTasks) { return; }
+
+    /* Прокручування мапи: зсуваємо доріжку на одне вікно. Відсоток рахується
+       від висоти доріжки, а вона дорівнює висоті одного екрана. */
+    track.style.transform = 'translateY(-' + (index * 100) + '%)';
+
+    /* Кадр наступного вікна монтується САМЕ ЗАРАЗ — він устигне завантажитися,
+       поки триває анімація зсуву. Уже змонтовані не чіпаємо: у них може бути
+       розпочате учнем завдання. */
+    var screen = screens[index];
+    if (screen && !screen.mounted) { mountFrame(screen); }
+  }
+
+  /* Міри на сцені ще немає — вона лишилася добивати ворога позаду. Кнопка при
+     цьому НЕ блокується: користувача ніщо не тримає, чекає лише сцена. */
+  function onWait(secondsLeft) {
+    waitLine.textContent = secondsLeft
+      ? 'Міра ще не наздогнала — ' + secondsLeft + ' с'
+      : '';
+  }
+
+  function onFinish() {
+    controls.hidden = false;
+    nextBtn.hidden = true;
+    waitLine.textContent = '';
+    strip.hidden = true;
+
+    if (window.HLGAnalytics) {
+      HLGAnalytics.endSession({ score: 0, won: true, attempts: 1 });
+    }
+  }
+
+  /* --- вибір режиму -------------------------------------------------------- */
+
+  function paintChoice() {
+    modeTasks.setAttribute('aria-pressed', withTasks ? 'true' : 'false');
+    modeStory.setAttribute('aria-pressed', withTasks ? 'false' : 'true');
+  }
+
+  modeTasks.addEventListener('click', function () {
+    withTasks = true; paintChoice(); saveChoice();
+  });
+  modeStory.addEventListener('click', function () {
+    withTasks = false; paintChoice(); saveChoice();
+  });
+
+  /* Кнопка не блокується: рушій сам відмовить, поки триває перехід, а чекати
+     на Міру користувач не зобов'язаний — у цьому й суть. */
+  nextBtn.addEventListener('click', function () {
+    window.NarrativeStage.advance();
+  });
+
+  document.getElementById('startBtn').addEventListener('click', function () {
+    intro.hidden = true;
+    arena.hidden = false;
+    strip.hidden = !withTasks;
+    /* Клас вішається ДО init(): він знімає гортання, вікно втрачає смугу
+       прокрутки й змінює ширину — сітку треба рахувати вже після цього. */
+    document.body.classList.add('is-arena');
+
+    var data = window.VIRASKA_DATA;
+    if (withTasks) { buildScreens(data.locations); }
+
+    var reserve = data.reserve || {};
+    window.NarrativeStage.init({
+      containerId: 'stage',
+      panelId: 'arena',
+      reserve: withTasks ? reserve.tasks : reserve.story,
+      data: data,
+      basePath: '../' + data.basePath,
+      narrateId: 'stageStatus',
+      onArrive: onArrive,
+      onWait: onWait,
+      onFinish: onFinish
+    });
+  });
+
+  loadChoice();
+  paintChoice();
+
+  /* Аналітика — під перевіркою присутності: гра мусить працювати й без неї.
+     ГАМАНЦЯ ТУТ НЕМАЄ І БУТИ НЕ МАЄ. Сторітелінг не перевіряє жодної навички
+     НМТ, тому монет не платить — рішення куратора, а не забутий рядок. */
+  if (window.HLGAnalytics) { HLGAnalytics.startSession('viraska'); }
+})();
+</script>
+
+<!-- Коли з'являться — саме в цьому порядку (export.md E9):
+     nav.js -> analytics.js -> accessibility.js -->
+</body>
+</html>

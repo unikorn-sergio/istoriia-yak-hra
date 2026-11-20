@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Розкопки — Історія як гра</title>
+
+<!-- FOUC-guard. Копія docs/head-fragment.html — мусить бути інлайновим і
+     стояти ДО стилів, інакше темна тема блимає світлим (пастка N11). -->
+<script>
+  (function () {
+    'use strict';
+    try {
+      var root = document.documentElement;
+      if (localStorage.getItem('histgame_theme') === 'dark') {
+        root.setAttribute('data-theme-dark', '1');
+      }
+      var size = localStorage.getItem('histgame_fontsize');
+      if (size === 'lg') { root.classList.add('font-lg'); }
+      if (size === 'xl') { root.classList.add('font-xl'); }
+      if (localStorage.getItem('histgame_reducemotion') === '1') {
+        root.classList.add('reduce-motion');
+      }
+      if (localStorage.getItem('histgame_highcontrast') === '1') {
+        root.classList.add('high-contrast');
+      }
+    } catch (e) { /* приватний режим — лишаємо типову тему */ }
+  })();
+</script>
+
+<link rel="stylesheet" href="../shared/css/reset.css">
+<link rel="stylesheet" href="../shared/css/theme.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<style>
+  body { --game-accent: var(--color-accent-1); }
+
+  .page--dig { max-width: 1100px; }
+
+  .dig-hud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+  }
+  .dig-hud__box {
+    padding: var(--space-xs) var(--space-md);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-raised);
+  }
+  .dig-hud__label {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .dig-hud__value { font-size: var(--text-lg); font-weight: 700; }
+
+  .dig-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: var(--space-md);
+    align-items: start;
+  }
+  @media (max-width: 860px) { .dig-layout { grid-template-columns: minmax(0, 1fr); } }
+
+  /* Ділянка. Ґрунт — кольори землі, а не токени теми: це предмет, а не
+     інтерфейс, і в темній темі земля лишається землею. */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 6), minmax(0, 1fr));
+    gap: 6px;
+    padding: 10px;
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: #6b4a2f;
+  }
+  .dig {
+    position: relative;
+    aspect-ratio: 1;
+    border: 2px solid #3d2a1a;
+    border-radius: 6px;
+    background:
+      radial-gradient(circle at 30% 30%, #9b7350 0 8%, transparent 9%),
+      radial-gradient(circle at 70% 65%, #8a6545 0 6%, transparent 7%),
+      #a57b54;
+    cursor: pointer;
+    padding: 6%;
+  }
+  .dig:hover { filter: brightness(1.08); }
+  .dig:focus-visible { outline: 3px solid var(--color-accent-1); outline-offset: 2px; }
+  .dig--open { background: #d9c3a0; cursor: default; }
+  .dig--find { cursor: grab; background: #efe1c6; }
+  .dig--selected { box-shadow: 0 0 0 4px var(--color-accent-1); }
+  .dig--ok { background: #d6ead2; }
+  .dig--bad { background: #f1d3cd; }
+  .dig svg { width: 100%; height: 100%; display: block; pointer-events: none; }
+  .dig__mark {
+    position: absolute;
+    right: 4px;
+    top: 2px;
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: #1d5e33;
+  }
+  .dig--bad .dig__mark { color: #8f2416; }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+  .panel__box {
+    padding: var(--space-sm) var(--space-md);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-raised);
+  }
+  .panel__title {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-xs);
+  }
+  .panel__find { font-size: var(--text-lg); font-weight: 700; }
+  .panel__note { font-size: var(--text-base); }
+  .panel__note[data-kind="ok"] { border-left: 6px solid var(--color-success); padding-left: var(--space-sm); }
+  .panel__note[data-kind="bad"] { border-left: 6px solid var(--color-danger); padding-left: var(--space-sm); }
+
+  .bins { display: flex; flex-direction: column; gap: var(--space-xs); }
+  .bin {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 0 var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    border: 2px dashed var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-raised);
+    color: var(--color-text-primary);
+    text-align: left;
+  }
+  .bins--active .bin { border-style: solid; border-color: var(--color-ink); cursor: pointer; }
+  .bins--active .bin:hover, .bin--over { background: var(--color-surface-strong); }
+  .bin__name { font-weight: 700; font-size: var(--text-sm); }
+  .bin__hint { grid-column: 1; font-size: var(--text-xs); color: var(--color-text-secondary); }
+  .bin__count {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    font-family: var(--font-mono);
+    font-size: var(--text-lg);
+  }
+
+  .dig-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-md);
+    background: rgba(13, 17, 23, 0.45);
+    z-index: 10;
+  }
+  .dig-overlay__card {
+    max-width: 38rem;
+    max-height: 100%;
+    overflow-y: auto;
+    padding: var(--space-md) var(--space-lg);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+    color: var(--color-text-primary);
+  }
+  .dig-overlay__title { font-size: var(--text-xl); margin-bottom: var(--space-sm); }
+  .dig-overlay__text { font-size: var(--text-base); margin-bottom: var(--space-sm); }
+  .dig-overlay__buttons { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-sm); }
+  .dig-list { margin: 0 0 var(--space-sm) 1.1rem; font-size: var(--text-sm); }
+  .dig-list li { margin-bottom: var(--space-xs); list-style: disc; }
+</style>
+</head>
+<body data-nav="overlay"
+      data-section="Ігри"
+      data-game-title="Розкопки"
+      data-home-url="../index.html">
+
+<main class="page page--dig">
+  <header class="page__header">
+    <h1 class="page__title">Розкопки</h1>
+    <p class="page__meta">Стародавня історія України · розкопайте ділянку й розкладіть знахідки за культурами.</p>
+  </header>
+
+  <div id="errorSlot"></div>
+
+  <div id="game">
+    <div class="dig-hud">
+      <div class="dig-hud__box">
+        <span class="dig-hud__label">Знахідки</span>
+        <span class="dig-hud__value"><span id="done">0</span> / <span id="total">12</span></span>
+      </div>
+      <div class="dig-hud__box">
+        <span class="dig-hud__label">Правильно</span>
+        <span class="dig-hud__value" id="correct">0</span>
+      </div>
+      <div class="dig-hud__box">
+        <span class="dig-hud__label">Життя</span>
+        <span class="dig-hud__value" id="lives" aria-live="polite">♥♥♥</span>
+      </div>
+    </div>
+
+    <div class="dig-layout">
+      <section aria-label="Ділянка розкопок">
+        <div class="grid" id="grid"></div>
+      </section>
+
+      <aside class="panel" aria-label="Знахідка й культури">
+        <div class="panel__box">
+          <p class="panel__title">У руках</p>
+          <p class="panel__find" id="inHand">Нічого. Розкопайте клітинку.</p>
+        </div>
+        <div class="panel__box">
+          <p class="panel__title">Куди покласти</p>
+          <div class="bins" id="bins"></div>
+        </div>
+        <div class="panel__box">
+          <p class="panel__title">Довідка</p>
+          <p class="panel__note" id="note" role="status" aria-live="polite">
+            Після кожної знахідки тут з’явиться, що це і звідки.
+          </p>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="dig-overlay" id="ovStart">
+    <div class="dig-overlay__card">
+      <h2 class="dig-overlay__title">Розкопки</h2>
+      <p class="dig-overlay__text">Ви — молодий археолог. Під ґрунтом ділянки лежать знахідки від кам’яного віку до давніх слов’ян.</p>
+      <ul class="dig-list">
+        <li>Натисніть клітинку — вона розкопується. Частина клітинок порожня.</li>
+        <li>Знахідку покладіть у кошик її культури: натисніть кошик або перетягніть знахідку на нього.</li>
+        <li>Хибний кошик забирає життя, їх три. Після кожної знахідки — коротка довідка.</li>
+      </ul>
+      <button class="button" id="startBtn" type="button">Почати розкопки</button>
+    </div>
+  </div>
+
+  <div class="dig-overlay" id="ovEnd" hidden>
+    <div class="dig-overlay__card">
+      <h2 class="dig-overlay__title" id="endTitle">Розкопки завершено</h2>
+      <p class="dig-overlay__text" id="endRating"></p>
+      <p class="dig-overlay__text" id="endStats"></p>
+      <p class="dig-overlay__text" id="endCoins"></p>
+      <div id="endMistakesBox" hidden>
+        <p class="dig-overlay__text"><b>Варто перечитати:</b></p>
+        <ul class="dig-list" id="endMistakes"></ul>
+      </div>
+      <div class="rating" id="rateSlot"></div>
+      <div class="dig-overlay__buttons">
+        <button class="button" id="againBtn" type="button">Нова ділянка</button>
+        <a class="button button--quiet" href="../index.html">На головну</a>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- «Архів»: візит сторінки й сесії гри (shared/js/analytics.js). -->
+<script src="../shared/js/analytics.js"></script>
+<script src="../data/arcade/rozkopky.js"></script>
+<script src="../data/games-registry.js"></script>
+<script src="../shared/js/wallet.js"></script>
+<script src="rozkopky/art.js"></script>
+<script src="rozkopky/game.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var data = window.ROZKOPKY_DATA;
+  function $(id) { return document.getElementById(id); }
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) { node.className = className; }
+    if (text !== undefined && text !== null) { node.textContent = String(text); }
+    return node;
+  }
+
+  if (!data || !window.Rozkopky) {
+    $('errorSlot').appendChild(el('p', 'status',
+      'Не вдалося завантажити гру: бракує data/arcade/rozkopky.js або rozkopky/game.js.'));
+    $('game').hidden = true;
+    return;
+  }
+
+  /* id гри — той самий у гаманці й аналітиці (CLAUDE.md: «registry id = moduleId»). */
+  var match = /[?&]game=([^&#]*)/.exec(window.location.search);
+  var gameId = match ? decodeURIComponent(match[1]) : data.topic + ':rozkopky';
+  var mistakes = [];
+  var done = 0;
+  var right = 0;
+  var sessionOpen = false;
+
+  function hearts(n) {
+    var out = '';
+    for (var i = 0; i < data.lives; i++) { out += i < n ? '♥' : '♡'; }
+    return out;
+  }
+
+  function plural(n, forms) {
+    var a = Math.abs(n) % 100, b = a % 10;
+    if (a > 10 && a < 20) { return forms[2]; }
+    if (b > 1 && b < 5) { return forms[1]; }
+    if (b === 1) { return forms[0]; }
+    return forms[2];
+  }
+
+  Rozkopky.init({
+    data: data,
+    gridId: 'grid',
+    binsId: 'bins',
+
+    onDig: function (find) {
+      if (!find) {
+        $('note').removeAttribute('data-kind');
+        $('note').textContent = 'Порожньо — лише ґрунт. Копайте далі.';
+      }
+    },
+
+    onSelect: function (find) {
+      $('inHand').textContent = find ? find.name : 'Нічого. Розкопайте клітинку.';
+    },
+
+    /* Факт одразу після класифікації — і правильної, і хибної
+       (docs/review-evidence.md, п. 1: ефект тримається на підтримці). */
+    onClassify: function (info) {
+      done += 1;
+      $('done').textContent = String(done);
+      $('lives').textContent = hearts(info.lives);
+      if (info.ok) {
+        right += 1;
+        $('correct').textContent = String(right);
+        $('note').setAttribute('data-kind', 'ok');
+        $('note').textContent = '✓ ' + info.find.name + ' — ' + info.culture.name + '. ' + info.find.note;
+      } else {
+        $('note').setAttribute('data-kind', 'bad');
+        $('note').textContent = '✗ ' + info.find.name + ' — це не «' + info.chosen.name
+          + '», а «' + info.culture.name + '». ' + info.find.note;
+        mistakes.push(info);
+      }
+      if (window.HLGAnalytics) { HLGAnalytics.answer(info.find.req, info.ok); }
+    },
+
+    onFinish: function (r) {
+      var ratio = r.total ? r.correct / r.total : 0;
+      var text = '';
+      for (var i = 0; i < data.ratings.length; i++) {
+        if (ratio >= data.ratings[i].min) { text = data.ratings[i].text; break; }
+      }
+      $('endTitle').textContent = r.lives > 0 ? 'Розкопки завершено' : 'Життя скінчилися';
+      $('endRating').textContent = text;
+      $('endStats').textContent = 'Правильно: ' + r.correct + ' з ' + r.total
+        + ', помилок: ' + r.wrong + ', розкопано клітинок: ' + r.digs + ', час: ' + r.seconds + ' с.';
+
+      /* Монети — шкалою: правильні з усіх закопаних (нерозкладене — нуль). */
+      var gained = window.HLGWallet ? HLGWallet.award(gameId, { score: r.correct, total: r.total }) : 0;
+      $('endCoins').textContent = gained
+        ? '+' + gained + ' ' + plural(gained, ['монета', 'монети', 'монет']) + '.'
+        : 'Монет не нараховано: потрібно правильно розкласти щонайменше 70 % знахідок.';
+
+      var list = $('endMistakes');
+      while (list.firstChild) { list.removeChild(list.firstChild); }
+      mistakes.forEach(function (m) {
+        list.appendChild(el('li', null, m.find.name + ' — ' + m.culture.name + '. ' + m.find.note));
+      });
+      $('endMistakesBox').hidden = mistakes.length === 0;
+
+      if (window.HLGAnalytics && sessionOpen) {
+        HLGAnalytics.endSession({ score: r.correct, total: r.total, won: r.lives > 0, attempts: 1 });
+        sessionOpen = false;
+      }
+      if (window.HLGAnalytics) { HLGAnalytics.renderRating('rateSlot', gameId); }
+      $('ovEnd').hidden = false;
+    }
+  });
+
+  function begin() {
+    mistakes = [];
+    done = 0;
+    right = 0;
+    $('done').textContent = '0';
+    $('correct').textContent = '0';
+    $('total').textContent = String(data.finds);
+    $('lives').textContent = hearts(data.lives);
+    $('inHand').textContent = 'Нічого. Розкопайте клітинку.';
+    $('note').removeAttribute('data-kind');
+    $('note').textContent = 'Після кожної знахідки тут з’явиться, що це і звідки.';
+    if (window.HLGAnalytics) { HLGAnalytics.startSession(gameId); sessionOpen = true; }
+    $('ovStart').hidden = true;
+    $('ovEnd').hidden = true;
+    Rozkopky.start();
+  }
+
+  $('startBtn').addEventListener('click', begin);
+  $('againBtn').addEventListener('click', begin);
+  window.rozkopkyDebug = Rozkopky.debug;
+})();
+</script>
+</body>
+</html>

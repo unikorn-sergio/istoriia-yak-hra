@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Частина шоста — (не)історична історія</title>
+
+<!-- FOUC-guard. Копія docs/head-fragment.html — мусить бути інлайновим і
+     стояти ДО стилів, інакше темна тема блимає світлим (пастка N11). -->
+<script>
+  (function () {
+    'use strict';
+    try {
+      var root = document.documentElement;
+      if (localStorage.getItem('histgame_theme') === 'dark') {
+        root.setAttribute('data-theme-dark', '1');
+      }
+      var size = localStorage.getItem('histgame_fontsize');
+      if (size === 'lg') { root.classList.add('font-lg'); }
+      if (size === 'xl') { root.classList.add('font-xl'); }
+      if (localStorage.getItem('histgame_reducemotion') === '1') {
+        root.classList.add('reduce-motion');
+      }
+      if (localStorage.getItem('histgame_highcontrast') === '1') {
+        root.classList.add('high-contrast');
+      }
+    } catch (e) { /* приватний режим — лишаємо типову тему */ }
+  })();
+</script>
+
+
+<!-- Замок ланцюга. Мусить стояти в <head> і синхронно: рішення про те,
+     показувати завдання чи панель замка, ухвалюється ДО <body>, інакше
+     закрита частина встигає почати тягнути тринадцять чужих кадрів. -->
+<script src="neistorychna/chain-lock.js"></script>
+
+<link rel="stylesheet" href="../shared/css/reset.css">
+<link rel="stylesheet" href="../shared/css/theme.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<style>
+  /* Характер саме цієї частини. Обидва оголошення стоять на body, а не в
+     :root — інакше --game-bg застиг би зі світлим градієнтом, і в темній темі
+     сторінка лишилася б кремовою (theme.css, коментар над `body`).
+
+     Правити тут вільно: сторінка самодостатня, спільного файла стилів у
+     ланцюга немає навмисно — шість частин мусять розходитися між собою. */
+  body {
+    --game-accent: var(--color-accent-3);
+    --game-bg: radial-gradient(circle at 20% 0%,
+                               var(--color-bg-raised) 0%,
+                               var(--block-9-bg) 65%);
+    /* Висота вікна Wordwall. rem, а не px: масштаб шрифту тягне за собою
+       й завдання. */
+    --frame-h: min(70vh, 32rem);
+  }
+
+  .chain {
+    max-width: 52rem;
+  }
+
+  .chain__badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: var(--space-xs) var(--space-sm);
+    border: var(--outline-width) solid var(--color-ink);
+    border-radius: var(--radius-full);
+    background: var(--color-bg-raised);
+    margin-bottom: var(--space-sm);
+  }
+
+  .seminar {
+    margin-top: var(--space-xl);
+  }
+
+  .seminar__title {
+    font-size: var(--text-lg);
+    color: var(--game-accent);
+    padding-bottom: var(--space-xs);
+    border-bottom: var(--outline-width) solid var(--color-ink);
+  }
+
+  .tests {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    margin-top: var(--space-md);
+  }
+
+  .test {
+    padding: var(--space-md);
+    border: var(--outline-width) solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+  }
+
+  .test__title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    font-size: var(--text-base);
+    color: var(--color-text-secondary);
+  }
+
+  .test__num {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--text-lg);
+    color: var(--game-accent);
+  }
+
+  /* Кадр Wordwall — головне на сторінці, тому він на всю ширину картки, а не
+     500 px із атрибута. У розмітці вбудовування змінено рівно одне —
+     loading="lazy"; без цього замкнена частина все одно тягнула б усі
+     тринадцять кадрів, бо display:none завантаження не спиняє. */
+  .test__frame {
+    margin-top: var(--space-sm);
+  }
+
+  .test__frame iframe {
+    display: block;
+    width: 100%;
+    height: var(--frame-h);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+
+  .test__back {
+    margin-top: var(--space-sm);
+    text-align: right;
+  }
+
+  .chain__end {
+    margin-top: var(--space-xl);
+    padding: var(--space-lg);
+    border: var(--outline-width) solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+    text-align: center;
+  }
+
+  .chain__end p {
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-md);
+  }
+
+  /* --- замок ------------------------------------------------------------
+     Рішення ухвалює neistorychna/chain-lock.js у <head>, ще до <body>: він
+     вішає атрибут на <html>, а ховає CSS. Якби ховав JS після завантаження,
+     закрита сторінка встигла б показати завдання й почати їх тягнути.
+
+     Класом, а не атрибутом hidden: reset.css має [hidden] { display: none
+     !important }, і жодне правило вже не змогло б розкрити панель назад. */
+
+  .chain__lock,
+  .chain__note {
+    display: none;
+  }
+
+  html[data-chain-locked] .chain__body { display: none; }
+  html[data-chain-locked] .chain__lock { display: block; }
+  html[data-chain-nostore] .chain__note { display: block; }
+
+  .chain__lock {
+    margin-top: var(--space-lg);
+    padding: var(--space-lg);
+    border: var(--outline-width) solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+    text-align: center;
+  }
+
+  .chain__lock h2 {
+    color: var(--game-accent);
+  }
+
+  .chain__lock p {
+    max-width: 34rem;
+    margin: var(--space-sm) auto var(--space-md);
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+  }
+
+  /* Селектор із двох класів, а не !important: правило .chain__lock p вище
+     специфічніше за самотній клас і мовчки перебило б розмір. */
+  .chain__lock .chain__lock-why {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+
+  .chain__note {
+    margin-top: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    border-left: 3px solid var(--game-accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: var(--color-surface);
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+  }
+</style>
+</head>
+
+<body data-nav="false"
+      data-section="(не)історична історія"
+      data-game-title="Частина шоста"
+      data-home-url="../index.html">
+
+<main class="page chain">
+
+  <header class="page__header">
+    <p class="chain__badge">Частина 6 з 6</p>
+    <h1 class="page__title">Частина шоста</h1>
+    <p class="page__meta">
+      Семінари 28–33 · 13 завдань Wordwall. Після кожного можна повернутися
+      на головну; наступна частина відкривається в кінці цієї.
+    </p>
+  </header>
+
+  <!-- Показує chain-lock.js, коли порядок частин ніде зберегти. -->
+  <p class="chain__note">
+    Сховище браузера недоступне, тому порядок частин не запам'ятається.
+    Нічого не втрачено: йдіть за посиланням у кінці кожної частини.
+  </p>
+
+  <!-- Панель замка. Схована, поки chain-lock.js не поставить
+       data-chain-locked на <html>. -->
+  <section class="chain__lock">
+    <h2>Ця частина ще закрита</h2>
+    <p>
+      Частини йдуть по черзі. Ця відкривається посиланням у кінці
+      п'ятої частини — там, де закінчується тринадцяте завдання.
+    </p>
+    <a class="button" href="neistorychna-5.html">Частина п'ята</a>
+    <p>
+      <button type="button" class="button button--quiet" data-chain-open>
+        Все одно відкрити
+      </button>
+    </p>
+    <p class="chain__lock-why">
+      Ця кнопка тут навмисно. Замок веде по черзі, але не замуровує:
+      вчителеві, який показує матеріал, і учневі, який повернувся,
+      він заважати не має.
+    </p>
+    <p>
+      <a href="../index.html">← На головну</a>
+    </p>
+  </section>
+
+  <div class="chain__body">
+
+  <section class="seminar">
+    <h2 class="seminar__title">Семінар 28 (продовження)</h2>
+    <ol class="tests">
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">1</span>Повторіть цю гру, буде легше
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/6a4f4bf1b2764becacffbf4a56e766eb?themeId=21&templateId=68&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="seminar">
+    <h2 class="seminar__title">Семінар 29</h2>
+    <ol class="tests">
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">2</span>&quot;В криївці&quot;
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/c6e23906948e41feb51dd7439d7eab40?themeId=1&templateId=2&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="seminar">
+    <h2 class="seminar__title">Семінар 30</h2>
+    <ol class="tests">
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">3</span>Новини 40-х
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/5192c6fa772a43f2ab0b3d19d158a884?themeId=41&templateId=76&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">4</span>&quot;Трудова Україна&quot; 40-х
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/2ab4f24ca52043cfa1e2565c5d5ee64d?themeId=1&templateId=35&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">5</span>Із архівів НКВС
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/3aea7278f6a0490a880d1f4e1e016306?themeId=1&templateId=81&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="seminar">
+    <h2 class="seminar__title">Семінар 31</h2>
+    <ol class="tests">
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">6</span>Канонічний мем НМТ - Хрущов
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/ce22ffa1b7c144fb9b7f2579131c8d1a?themeId=1&templateId=35&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">7</span>Перша шапльта &quot;Комуністичної Укаїни&quot;
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/a410288e19f146a6813ec3f8bf60f569?themeId=1&templateId=50&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">8</span>Із засідань ЦК КПУ
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/68b91b2cdd5545b3b1a458cd57e82bbd?themeId=1&templateId=36&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">9</span>Розмови на кухні Відлиги
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/eee90a6cb64b482e8781ccbb5767389f?themeId=1&templateId=89&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">10</span>Відлига та її друзі
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/c72b62d3ee404eae89ab1617b3b8b015?themeId=62&templateId=88&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="seminar">
+    <h2 class="seminar__title">Семінар 32</h2>
+    <ol class="tests">
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">11</span>Колонка &quot;Головні новини тижня&quot;
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/b5dbfc00929345bd93cb870f898cae69?themeId=65&templateId=2&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">12</span>Рубрика &quot;Знаменитості&quot;
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/3774f9eb7e154d9fbebb25388663fabc?themeId=1&templateId=3&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="seminar">
+    <h2 class="seminar__title">Семінар 33</h2>
+    <ol class="tests">
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">13</span>На ринку кінця 80-х
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/e33240a28ab347569eb2f515afd32b69?themeId=1&templateId=2&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+    </ol>
+  </section>
+
+  <footer class="chain__end">
+    <p>Кінець шостої частини. Це кінець ланцюга — усі 78 завдань пройдено.</p>
+    <a class="button button--quiet" href="../index.html">На головну</a>
+  </footer>
+
+  </div><!-- .chain__body -->
+
+</main>
+
+<!-- Єдиний JS сторінки — FOUC-guard і замок, обидва в <head>: обидва
+     мусять вирішити до першого малювання. Коли з'являться решта —
+     саме в цьому порядку (export.md E9):
+     nav.js -> analytics.js -> accessibility.js -->
+<!-- «Архів»: візит сторінки й сесії гри (shared/js/analytics.js). -->
+<script src="../shared/js/analytics.js"></script>
+</body>
+</html>

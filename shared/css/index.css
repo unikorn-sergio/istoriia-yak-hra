@@ -1,0 +1,483 @@
+/* Розкладка головної сторінки. Підключається лише нею.
+
+   Тут не вживається жодного --glass-*: конституція вимагає для рівня
+   «Обрати» пастель, чорний контур і мінімалізм, тобто рівно протилежне до
+   glassmorphism сторінок ігор.
+
+   Жодного font-size у px — тільки var(--text-*) (export.md E8). */
+
+.hub {
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: var(--space-lg) var(--space-md) var(--space-xl);
+}
+
+/* --- шапка ---------------------------------------------------------------- */
+
+.hub__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.hub__title {
+  font-size: var(--text-3xl);
+  letter-spacing: -0.01em;
+}
+
+.hub__subtitle {
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  margin-top: var(--space-xs);
+  max-width: 34rem;
+}
+
+/* --- гаманець ------------------------------------------------------------- */
+
+.wallet {
+  border: var(--outline-width) solid var(--color-ink);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-raised);
+  padding: var(--space-sm) var(--space-md);
+  min-width: 11rem;
+}
+
+.wallet__label {
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.wallet__value {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  line-height: 1.1;
+}
+
+/* Попередження про недоступне сховище. Показується лише коли справді є що
+   сказати — мовчазна втрата покупок гірша за видиме попередження. */
+.wallet__note {
+  font-size: var(--text-xs);
+  color: var(--color-danger);
+  margin-top: var(--space-xs);
+  max-width: 14rem;
+}
+
+.wallet__note[hidden] {
+  display: none;
+}
+
+/* --- спільний заголовок секції -------------------------------------------- */
+
+.hub__section {
+  margin-bottom: var(--space-xl);
+}
+
+.hub__section-title {
+  font-size: var(--text-lg);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-md);
+}
+
+/* --- поле «Гра у грі» ------------------------------------------------------ */
+
+.mini {
+  border: var(--outline-width) solid var(--color-ink);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-raised);
+  padding: var(--space-md);
+  min-height: 8rem;
+}
+
+.mini__fact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  align-items: flex-start;
+}
+
+.mini__fact-badge {
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.mini__fact-text {
+  font-size: var(--text-lg);
+  max-width: 44rem;
+}
+
+.mini__fact-source {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* --- наративні ігри --------------------------------------------------------
+
+   Розділ «(не)історична історія». Свідомо не схожий на кнопку теми: ці ігри
+   нічого не перевіряють і не платять монет, і учень має бачити це до кліку,
+   а не дізнаватися після. */
+
+.stories {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: var(--space-md);
+}
+
+.story {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border: var(--outline-width) solid var(--color-ink);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-raised);
+  text-decoration: none;
+  color: inherit;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.story:hover,
+.story:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: var(--glass-shadow);
+}
+
+.story__title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+
+.story__hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* --- сітка блоків ---------------------------------------------------------- */
+
+.blocks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+  gap: var(--space-md);
+  /* Без цього блок із двома темами розтягується під сусіда з сімома і дає
+     пів екрана порожнього пастельного поля. */
+  align-items: start;
+}
+
+.block {
+  background: var(--block-bg, var(--color-bg-raised));
+  border: var(--outline-width) solid var(--color-ink);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.block__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.block__num {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border: var(--outline-width) solid var(--color-ink);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  align-self: flex-start;
+}
+
+.block__title {
+  font-size: var(--text-lg);
+}
+
+.block__range {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.block__coverage {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  border-top: 1px solid var(--color-ink);
+  padding-top: var(--space-xs);
+  opacity: 0.75;
+}
+
+/* --- тема всередині блоку --------------------------------------------------- */
+
+.topics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.topic {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.topic__num {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+/* Заголовки тем програми НМТ бувають на 90 символів — у кнопковий рядок вони
+   не влазять. Повна назва лишається в title і доступна скрін-рідеру. */
+.topic__name {
+  font-size: var(--text-sm);
+  flex: 1 1 8rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topic__empty {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Підпис прогресу — окремий рядок на всю ширину теми (flex-basis 100 %),
+   щоб не ламати рядок кнопок. */
+.topic__progress {
+  flex-basis: 100%;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  padding-left: 1.75em;
+}
+
+.topic__progress-line {
+  display: block;
+}
+
+/* --- кнопка гри ------------------------------------------------------------- */
+
+.game {
+  font-size: var(--text-sm);
+  font-family: var(--font-display);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  border: var(--outline-width) solid var(--color-ink);
+  background: var(--color-bg-raised);
+  color: var(--color-text-primary);
+  transition: background var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.game:hover {
+  background: var(--color-ink);
+  color: var(--color-bg-raised);
+}
+
+/* Замкнена. Приглушена й пунктирна, але клікабельна — це кнопка покупки,
+   а не мертвий елемент. */
+.game--locked {
+  border-style: dashed;
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.game--locked:hover {
+  background: var(--color-surface-strong);
+  color: var(--color-text-primary);
+}
+
+/* Квадратик опанування (Khan Academy): порожній — не грали, третина —
+   спроба, дві третини — зараховано (≥ 70 %), повний — 100 %.
+   Розрізняються формою заливки, а не лише відтінком: у високому контрасті
+   й для дальтоніків колір не єдина ознака. */
+.game__mark {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-right: 0.4em;
+  vertical-align: -0.05em;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  background: transparent;
+}
+
+.game__mark--try {
+  background: linear-gradient(to top, var(--color-accent-1) 34%, transparent 34%);
+}
+
+.game__mark--pass {
+  background: linear-gradient(to top, var(--color-success) 67%, transparent 67%);
+}
+
+.game__mark--full {
+  background: var(--color-success);
+}
+
+.game__price {
+  font-family: var(--font-mono);
+  margin-left: var(--space-xs);
+}
+
+/* Не вистачає монет — коротка підсвітка замість тексту-докору. */
+.game--denied {
+  animation: game-deny 420ms ease;
+  border-color: var(--color-danger);
+}
+
+@keyframes game-deny {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-3px); }
+  75%      { transform: translateX(3px); }
+}
+
+/* --- рядок «ще в розробці» ---------------------------------------------------
+
+   Планові кнопки навмисно НЕ рендеряться шістьма сірими прямокутниками:
+   один живий елемент серед шести мертвих читається як зламана сторінка.
+   Але й ховати їх не можна — це видимість покриття програми. */
+.block__soon {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.block__soon b {
+  font-weight: 600;
+}
+
+/* --- рядок стану ------------------------------------------------------------- */
+
+.hub__status {
+  position: sticky;
+  bottom: var(--space-md);
+  margin: var(--space-md) 0 0;
+  padding: var(--space-sm) var(--space-md);
+  border: var(--outline-width) solid var(--color-ink);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-raised);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.hub__status[hidden] {
+  display: none;
+}
+
+/* --- підвал -------------------------------------------------------------------- */
+
+.hub__footer {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+.hub__footer a {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* --- вузький екран --------------------------------------------------------------- */
+
+@media (max-width: 40rem) {
+  .hub {
+    padding: var(--space-md) var(--space-sm) var(--space-lg);
+  }
+  .blocks {
+    grid-template-columns: 1fr;
+  }
+  .topic__name {
+    flex-basis: 100%;
+  }
+}
+
+/* --- «Мій архів» (shared/js/analytics.js, renderDashboard) ----------------------- */
+
+.archive__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.archive__stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 7rem;
+  padding: var(--space-xs) var(--space-md);
+  border: var(--outline-width) solid var(--color-ink);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-raised);
+}
+
+.archive__value {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+.archive__label {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.archive__note {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-sm);
+  max-width: 48rem;
+}
+
+.archive__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+/* Кнопка без заливки — другорядна дія поруч із головною. */
+.game--plain {
+  background: transparent;
+}
+
+.archive__details {
+  margin-top: var(--space-sm);
+  font-size: var(--text-sm);
+}
+
+.archive__details summary {
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+
+.archive__preview {
+  margin-top: var(--space-xs);
+  padding: var(--space-sm);
+  max-height: 16rem;
+  overflow: auto;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-raised);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+}

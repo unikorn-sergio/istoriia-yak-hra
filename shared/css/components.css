@@ -1,0 +1,490 @@
+/* Спільні компоненти. Жодного font-size у px — тільки var(--text-*). */
+
+.page {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: var(--space-lg) var(--space-md) var(--space-xl);
+}
+
+.page__header {
+  margin-bottom: var(--space-lg);
+}
+
+.page__title {
+  color: var(--game-accent);
+}
+
+.page__meta {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-top: var(--space-xs);
+}
+
+/* --- картка ------------------------------------------------------------- */
+
+.card {
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  padding: var(--space-md);
+}
+
+/* --- питання ------------------------------------------------------------ */
+
+/* Одне питання на екрані (plan1.md §6). Сцену будує quiz-engine.js. */
+.quiz-stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* --- шапка: «Питання 3 з 9», крапки, рахунок і серія ------------------- */
+
+.quiz-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-md);
+}
+
+.quiz-progress__label {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.quiz-progress__score {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.quiz-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Розмір крапки — у rem, тому росте разом зі шрифтом A/A+/A++. */
+.quiz-dot {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-border-strong);
+  background: transparent;
+}
+
+.quiz-dot--current {
+  border-color: var(--game-accent);
+}
+
+.quiz-dot--correct {
+  border-color: var(--color-success);
+  background: var(--color-success);
+}
+
+.quiz-dot--wrong {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+}
+
+.quiz-question {
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  border-left: 4px solid transparent;
+  border-radius: var(--radius-md);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  padding: var(--space-md);
+  transition: border-color var(--transition-base);
+}
+
+.quiz-question:focus,
+.quiz-question__text:focus,
+.quiz-result__score:focus {
+  outline: none;
+}
+
+.quiz-question.is-correct {
+  border-left-color: var(--color-success);
+}
+
+.quiz-question.is-wrong {
+  border-left-color: var(--color-danger);
+}
+
+.quiz-question__text {
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-sm);
+}
+
+.quiz-question__num {
+  color: var(--game-accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  margin-right: var(--space-xs);
+}
+
+/* --- уривок-умова -------------------------------------------------------- */
+
+.quiz-quote {
+  margin: 0 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-left: 3px solid var(--game-accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+
+/* Уривок може бути й варіантом відповіді — тоді він у .quiz-option і має
+   лишатися читним: без обрізання й без одного рядка на весь абзац. */
+.quiz-option {
+  white-space: normal;
+}
+
+/* --- варіанти ----------------------------------------------------------- */
+
+.quiz-options {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.quiz-option {
+  text-align: left;
+  font-size: var(--text-base);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.quiz-option:hover {
+  background: var(--color-surface-strong);
+  border-color: var(--color-border-strong);
+}
+
+/* «Знайди зайву»: чотири картки 2 × 2, на вузькому екрані — стовпцем. */
+.quiz-options--cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.quiz-options--cards .quiz-option {
+  min-height: 6.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-xs);
+  text-align: center;
+  padding: var(--space-md);
+}
+
+.quiz-option__reveal {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 30rem) {
+  .quiz-options--cards {
+    grid-template-columns: 1fr;
+  }
+  .quiz-options--cards .quiz-option {
+    min-height: 0;
+  }
+}
+
+.quiz-option:disabled {
+  cursor: default;
+}
+
+.quiz-option:disabled:hover {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+/* Після відповіді: правильний варіант зелений завжди, обраний хибний —
+   червоний. Колір не єдиний сигнал — є ще товста риска зліва. */
+.quiz-option.is-correct,
+.quiz-option.is-correct:disabled:hover {
+  border-color: var(--color-success);
+  box-shadow: inset 4px 0 0 var(--color-success);
+}
+
+.quiz-option.is-wrong,
+.quiz-option.is-wrong:disabled:hover {
+  border-color: var(--color-danger);
+  box-shadow: inset 4px 0 0 var(--color-danger);
+}
+
+/* --- вільне введення ---------------------------------------------------- */
+
+.quiz-input {
+  width: 100%;
+  font-size: var(--text-base);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.quiz-input:focus {
+  border-color: var(--game-accent);
+}
+
+.quiz-input.is-correct {
+  border-color: var(--color-success);
+}
+
+.quiz-input.is-wrong {
+  border-color: var(--color-danger);
+}
+
+.quiz-text-answer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.quiz-text-answer .quiz-input {
+  flex: 1 1 12rem;
+  width: auto;
+}
+
+/* --- пояснення ---------------------------------------------------------- */
+
+/* --- відгук після відповіді --------------------------------------------- */
+
+.quiz-feedback {
+  margin-top: var(--space-md);
+}
+
+.quiz-feedback__verdict {
+  font-weight: 600;
+  font-size: var(--text-base);
+}
+
+.quiz-feedback--correct .quiz-feedback__verdict {
+  color: var(--color-success);
+}
+
+.quiz-feedback--wrong .quiz-feedback__verdict {
+  color: var(--color-danger);
+}
+
+.quiz-feedback .actions {
+  margin-top: var(--space-md);
+}
+
+/* --- підсумок ------------------------------------------------------------ */
+
+.quiz-result {
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  padding: var(--space-lg) var(--space-md);
+  text-align: center;
+}
+
+.quiz-result__score {
+  font-size: var(--text-2xl);
+  color: var(--game-accent);
+}
+
+.quiz-dots--result {
+  justify-content: center;
+  margin: var(--space-sm) 0;
+}
+
+.quiz-result__coins {
+  font-size: var(--text-lg);
+  margin-top: var(--space-sm);
+}
+
+.quiz-result__note {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-xs);
+}
+
+.quiz-result .actions {
+  justify-content: center;
+}
+
+a.button {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.quiz-explain {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px dashed var(--color-border);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Факт після відповіді — головне, що учень має прочитати на цьому екрані,
+   тому не дрібний і не блідий (docs/review-evidence.md, п. 5). */
+.quiz-feedback .quiz-explain {
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+}
+
+.quiz-feedback .quiz-explain--detail {
+  border-top: none;
+  padding-top: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* --- дії ---------------------------------------------------------------- */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+}
+
+.button {
+  font-size: var(--text-base);
+  font-family: var(--font-display);
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-full);
+  background: var(--game-accent);
+  color: var(--color-text-inverse);
+  transition: transform var(--transition-fast), filter var(--transition-fast);
+}
+
+.button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.button--quiet {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+/* Кнопка всередині тісного блоку, де кожен піксель висоти належить вмісту, а
+   не обстановці (наративна гра: панель Wordwall). Шрифт лишається у var(--text-*),
+   тому перемикач доступності діє й тут. */
+.button--compact {
+  font-size: var(--text-sm);
+  padding: var(--space-xs) var(--space-md);
+}
+
+.status {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  min-height: 1.5em;
+  margin-top: var(--space-sm);
+}
+
+/* --- парольний блок ------------------------------------------------------ */
+
+.password-block {
+  margin-top: var(--space-lg);
+  padding: var(--space-md);
+  border: 2px solid var(--game-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-strong);
+  text-align: center;
+}
+
+.password-block__label {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.password-block__value {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  color: var(--game-accent);
+  letter-spacing: 0.04em;
+  margin-top: var(--space-xs);
+}
+
+/* Лише для скрін-рідера: live-область вікторини. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- помилка ------------------------------------------------------------- */
+
+.error-box {
+  border: 2px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
+.error-box code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 40rem) {
+  .page {
+    padding: var(--space-md) var(--space-sm) var(--space-lg);
+  }
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* --- оцінка гри слухачем -------------------------------------------------
+   Розмітку будує HLGAnalytics.renderRating() (shared/js/analytics.js): після
+   кожної гри слухач курсу каже, як вона йому, — так він впливає на те, які
+   ігри з'являться далі (рішення куратора 2026-11-20). */
+
+.rating { margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--color-border); }
+.rating__title { font-size: var(--text-sm); font-weight: 700; margin-bottom: var(--space-xs); }
+.rating__row { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-bottom: var(--space-xs); }
+.rating__button {
+  padding: var(--space-xs) var(--space-sm);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-raised);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+}
+.rating__button:hover { background: var(--color-ink); color: var(--color-bg-raised); }
+.rating__comment {
+  width: 100%;
+  padding: var(--space-xs);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+.rating__thanks { font-size: var(--text-sm); color: var(--color-text-secondary); }
+

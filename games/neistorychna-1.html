@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Частина перша — (не)історична історія</title>
+
+<!-- FOUC-guard. Копія docs/head-fragment.html — мусить бути інлайновим і
+     стояти ДО стилів, інакше темна тема блимає світлим (пастка N11). -->
+<script>
+  (function () {
+    'use strict';
+    try {
+      var root = document.documentElement;
+      if (localStorage.getItem('histgame_theme') === 'dark') {
+        root.setAttribute('data-theme-dark', '1');
+      }
+      var size = localStorage.getItem('histgame_fontsize');
+      if (size === 'lg') { root.classList.add('font-lg'); }
+      if (size === 'xl') { root.classList.add('font-xl'); }
+      if (localStorage.getItem('histgame_reducemotion') === '1') {
+        root.classList.add('reduce-motion');
+      }
+      if (localStorage.getItem('histgame_highcontrast') === '1') {
+        root.classList.add('high-contrast');
+      }
+    } catch (e) { /* приватний режим — лишаємо типову тему */ }
+  })();
+</script>
+
+
+<!-- Замок ланцюга. Мусить стояти в <head> і синхронно: рішення про те,
+     показувати завдання чи панель замка, ухвалюється ДО <body>, інакше
+     закрита частина встигає почати тягнути тринадцять чужих кадрів. -->
+<script src="neistorychna/chain-lock.js"></script>
+
+<link rel="stylesheet" href="../shared/css/reset.css">
+<link rel="stylesheet" href="../shared/css/theme.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<style>
+  /* Характер саме цієї частини. Обидва оголошення стоять на body, а не в
+     :root — інакше --game-bg застиг би зі світлим градієнтом, і в темній темі
+     сторінка лишилася б кремовою (theme.css, коментар над `body`).
+
+     Правити тут вільно: сторінка самодостатня, спільного файла стилів у
+     ланцюга немає навмисно — шість частин мусять розходитися між собою. */
+  body {
+    --game-accent: var(--color-accent-2);
+    --game-bg: radial-gradient(circle at 20% 0%,
+                               var(--color-bg-raised) 0%,
+                               var(--block-4-bg) 65%);
+    /* Висота вікна Wordwall. rem, а не px: масштаб шрифту тягне за собою
+       й завдання. */
+    --frame-h: min(70vh, 32rem);
+  }
+
+  .chain {
+    max-width: 52rem;
+  }
+
+  .chain__badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: var(--space-xs) var(--space-sm);
+    border: var(--outline-width) solid var(--color-ink);
+    border-radius: var(--radius-full);
+    background: var(--color-bg-raised);
+    margin-bottom: var(--space-sm);
+  }
+
+  .seminar {
+    margin-top: var(--space-xl);
+  }
+
+  .seminar__title {
+    font-size: var(--text-lg);
+    color: var(--game-accent);
+    padding-bottom: var(--space-xs);
+    border-bottom: var(--outline-width) solid var(--color-ink);
+  }
+
+  .tests {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    margin-top: var(--space-md);
+  }
+
+  .test {
+    padding: var(--space-md);
+    border: var(--outline-width) solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+  }
+
+  .test__title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    font-size: var(--text-base);
+    color: var(--color-text-secondary);
+  }
+
+  .test__num {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--text-lg);
+    color: var(--game-accent);
+  }
+
+  /* Кадр Wordwall — головне на сторінці, тому він на всю ширину картки, а не
+     500 px із атрибута. У розмітці вбудовування змінено рівно одне —
+     loading="lazy"; без цього замкнена частина все одно тягнула б усі
+     тринадцять кадрів, бо display:none завантаження не спиняє. */
+  .test__frame {
+    margin-top: var(--space-sm);
+  }
+
+  .test__frame iframe {
+    display: block;
+    width: 100%;
+    height: var(--frame-h);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+
+  .test__back {
+    margin-top: var(--space-sm);
+    text-align: right;
+  }
+
+  .chain__end {
+    margin-top: var(--space-xl);
+    padding: var(--space-lg);
+    border: var(--outline-width) solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+    text-align: center;
+  }
+
+  .chain__end p {
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-md);
+  }
+
+  /* --- замок ------------------------------------------------------------
+     Рішення ухвалює neistorychna/chain-lock.js у <head>, ще до <body>: він
+     вішає атрибут на <html>, а ховає CSS. Якби ховав JS після завантаження,
+     закрита сторінка встигла б показати завдання й почати їх тягнути.
+
+     Класом, а не атрибутом hidden: reset.css має [hidden] { display: none
+     !important }, і жодне правило вже не змогло б розкрити панель назад. */
+
+  .chain__lock,
+  .chain__note {
+    display: none;
+  }
+
+  html[data-chain-locked] .chain__body { display: none; }
+  html[data-chain-locked] .chain__lock { display: block; }
+  html[data-chain-nostore] .chain__note { display: block; }
+
+  .chain__lock {
+    margin-top: var(--space-lg);
+    padding: var(--space-lg);
+    border: var(--outline-width) solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+    text-align: center;
+  }
+
+  .chain__lock h2 {
+    color: var(--game-accent);
+  }
+
+  .chain__lock p {
+    max-width: 34rem;
+    margin: var(--space-sm) auto var(--space-md);
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+  }
+
+  /* Селектор із двох класів, а не !important: правило .chain__lock p вище
+     специфічніше за самотній клас і мовчки перебило б розмір. */
+  .chain__lock .chain__lock-why {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+
+  .chain__note {
+    margin-top: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    border-left: 3px solid var(--game-accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: var(--color-surface);
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+  }
+</style>
+</head>
+
+<body data-nav="false"
+      data-section="(не)історична історія"
+      data-game-title="Частина перша"
+      data-home-url="../index.html">
+
+<main class="page chain">
+
+  <header class="page__header">
+    <p class="chain__badge">Частина 1 з 6</p>
+    <h1 class="page__title">Частина перша</h1>
+    <p class="page__meta">
+      Семінари 11–12 · 13 завдань Wordwall. Після кожного можна повернутися
+      на головну; наступна частина відкривається в кінці цієї.
+    </p>
+  </header>
+
+  <!-- Показує chain-lock.js, коли порядок частин ніде зберегти. -->
+  <p class="chain__note">
+    Сховище браузера недоступне, тому порядок частин не запам'ятається.
+    Нічого не втрачено: йдіть за посиланням у кінці кожної частини.
+  </p>
+
+  <div class="chain__body">
+
+  <section class="seminar">
+    <h2 class="seminar__title">Семінар 11</h2>
+    <ol class="tests">
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">1</span>Завдання
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/531678c9395849b7b6425599ede5d8d5?themeId=52&templateId=25&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">2</span>Завдання
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/0bae8ec84a954655ac3b892703574386?themeId=22&templateId=45&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">3</span>Завдання
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/a3b72d1893e8478cb3328c38f77c6c41?themeId=46&templateId=48&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">4</span>Завдання
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/5e00b481ccdd45ce842ef5ce36341cc0?themeId=1&templateId=22&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">5</span>Завдання
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/b832e07a00e542768608bb9c9795eec1?themeId=44&templateId=73&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">6</span>Завдання
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/512971572a604fc8855df420051df7ff?themeId=1&templateId=36&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">7</span>Завдання
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/81086c481a0a4fa3b43c666f54ea67e5?themeId=1&templateId=81&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">8</span>Завдання
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/1c9835d21ba04c759f4466f273bf67f2?themeId=1&templateId=22&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="seminar">
+    <h2 class="seminar__title">Семінар 12</h2>
+    <ol class="tests">
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">9</span>Завдання
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/79e751848c874331a849a16e50aac24d?themeId=48&templateId=76&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">10</span>Завдання
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/6a29fe98915b4082a13789550a4d13f9?themeId=1&templateId=3&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">11</span>Завдання
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/20fd0036de6e4b5783b74c764d7531c4?themeId=1&templateId=46&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">12</span>Завдання
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/76b7a4c343ae4666a06fb37bf499cd14?themeId=1&templateId=35&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+
+      <li class="test">
+        <h3 class="test__title">
+          <span class="test__num">13</span>Завдання
+        </h3>
+        <div class="test__frame">
+          <iframe loading="lazy" style="max-width:100%" src="https://wordwall.net/embed/488e0b64688d49039cdbfae2f5b5715f?themeId=1&templateId=2&fontStackId=0" width="500" height="380" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <p class="test__back">
+          <a class="button button--quiet" href="../index.html">На головну</a>
+        </p>
+      </li>
+    </ol>
+  </section>
+
+  <footer class="chain__end">
+    <p>Кінець першої частини. Далі — друга.</p>
+    <!-- data-chain-next: саме цей клік відмикає наступну частину. -->
+    <a class="button" data-chain-next href="neistorychna-2.html">Частина друга →</a>
+    <a class="button button--quiet" href="../index.html">На головну</a>
+  </footer>
+
+  </div><!-- .chain__body -->
+
+</main>
+
+<!-- Єдиний JS сторінки — FOUC-guard і замок, обидва в <head>: обидва
+     мусять вирішити до першого малювання. Коли з'являться решта —
+     саме в цьому порядку (export.md E9):
+     nav.js -> analytics.js -> accessibility.js -->
+<!-- «Архів»: візит сторінки й сесії гри (shared/js/analytics.js). -->
+<script src="../shared/js/analytics.js"></script>
+</body>
+</html>

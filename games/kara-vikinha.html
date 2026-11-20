@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кара вікінга — Історія як гра</title>
+
+<!-- FOUC-guard. Копія docs/head-fragment.html — мусить бути інлайновим і
+     стояти ДО стилів, інакше темна тема блимає світлим (пастка N11). -->
+<script>
+  (function () {
+    'use strict';
+    try {
+      var root = document.documentElement;
+      if (localStorage.getItem('histgame_theme') === 'dark') {
+        root.setAttribute('data-theme-dark', '1');
+      }
+      var size = localStorage.getItem('histgame_fontsize');
+      if (size === 'lg') { root.classList.add('font-lg'); }
+      if (size === 'xl') { root.classList.add('font-xl'); }
+      if (localStorage.getItem('histgame_reducemotion') === '1') {
+        root.classList.add('reduce-motion');
+      }
+      if (localStorage.getItem('histgame_highcontrast') === '1') {
+        root.classList.add('high-contrast');
+      }
+    } catch (e) { /* приватний режим — лишаємо типову тему */ }
+  })();
+</script>
+
+<link rel="stylesheet" href="../shared/css/reset.css">
+<link rel="stylesheet" href="../shared/css/theme.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<style>
+  body { --game-accent: var(--color-accent-2); }
+
+  .page--viking { max-width: 1100px; }
+
+  .viking-hud {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+  }
+
+  .viking-hud__box {
+    padding: var(--space-xs) var(--space-md);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-raised);
+  }
+
+  .viking-hud__label {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .viking-hud__value { font-size: var(--text-lg); font-weight: 700; }
+  .viking-hud .button { align-self: center; }
+
+  /* Категорія — головне на екрані: від неї залежить, що ловити. */
+  .viking-hud__box--category {
+    flex: 1 1 14rem;
+    background: var(--color-accent-1);
+    color: #14110f;
+  }
+  .viking-hud__box--category .viking-hud__label { color: #14110f; opacity: 0.75; }
+  .viking-hud__box--category .viking-hud__value { font-size: var(--text-xl); }
+
+  .viking-stage {
+    position: relative;
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .viking-stage canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    cursor: none;
+  }
+  .viking-stage[data-state="ready"] canvas,
+  .viking-stage[data-state="paused"] canvas,
+  .viking-stage[data-state="over"] canvas { cursor: default; }
+
+  /* Вікінг: ноги внизу, тулуб із кошиком поверх — як в оригіналі, де нижній
+     шар малювався на пів висоти нижче верхнього. */
+  .viking {
+    position: absolute;
+    pointer-events: none;
+  }
+  .viking img {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 66.67%;
+    object-fit: fill;
+  }
+  .viking__legs { top: 33.33%; }
+  /* Тулуб зсунуто на 5 логічних px уліво й угору (рішення куратора
+     2026-11-20). Відсотки, а не px: вікінг масштабується разом із полотном,
+     тож зсув лишається 5 px поля 960×640 на будь-якій ширині екрана.
+     Ширина вікінга 128, висота 153 (VIKING_W, VIKING_H × 1,5 в engine.js). */
+  .viking img.viking__top { top: -3.268%; left: -3.906%; }
+
+  .viking-note {
+    min-height: 3.2em;
+    margin-top: var(--space-sm);
+    padding: var(--space-xs) var(--space-md);
+    border-left: 6px solid var(--color-border-strong);
+    font-size: var(--text-base);
+  }
+  .viking-note[data-kind="ok"] { border-left-color: var(--color-success); }
+  .viking-note[data-kind="bad"] { border-left-color: var(--color-danger); }
+
+  .viking-alert {
+    position: absolute;
+    top: 38%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: var(--space-sm) var(--space-lg);
+    border: 3px solid #14110f;
+    border-radius: var(--radius-lg);
+    background: var(--color-accent-1);
+    color: #14110f;
+    font-size: var(--text-xl);
+    font-weight: 700;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .viking-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-md);
+    background: rgba(13, 17, 23, 0.4);
+  }
+
+  .viking-overlay__card {
+    max-width: 36rem;
+    max-height: 100%;
+    overflow-y: auto;
+    padding: var(--space-md) var(--space-lg);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+    color: var(--color-text-primary);
+  }
+
+  .viking-overlay__title { font-size: var(--text-xl); margin-bottom: var(--space-sm); }
+  .viking-overlay__text { font-size: var(--text-base); margin-bottom: var(--space-sm); }
+  .viking-overlay__buttons { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-sm); }
+
+  .viking-rules { margin: 0 0 var(--space-sm) 1.1rem; font-size: var(--text-sm); }
+  .viking-rules li { margin-bottom: var(--space-xs); list-style: disc; }
+
+  .viking-mistakes { margin: 0 0 var(--space-sm) 1.1rem; font-size: var(--text-sm); }
+  .viking-mistakes li { margin-bottom: var(--space-xs); list-style: disc; }
+
+
+  .viking-hint { margin-top: var(--space-xs); font-size: var(--text-xs); color: var(--color-text-muted); }
+</style>
+</head>
+<body data-nav="overlay"
+      data-section="Ігри"
+      data-game-title="Кара вікінга"
+      data-home-url="../index.html">
+
+<main class="page page--viking">
+  <header class="page__header">
+    <h1 class="page__title">Кара вікінга</h1>
+    <p class="page__meta">Русь-Україна · ловіть лише те, що належить до категорії.</p>
+  </header>
+
+  <div id="errorSlot"></div>
+
+  <div id="game">
+    <div class="viking-hud">
+      <div class="viking-hud__box viking-hud__box--category">
+        <span class="viking-hud__label">Ловимо</span>
+        <span class="viking-hud__value" id="categoryName">—</span>
+      </div>
+      <div class="viking-hud__box">
+        <span class="viking-hud__label">Зловлено</span>
+        <span class="viking-hud__value"><span id="correct">0</span> / <span id="target">15</span></span>
+      </div>
+      <div class="viking-hud__box">
+        <span class="viking-hud__label">Очки</span>
+        <span class="viking-hud__value" id="score">0</span>
+      </div>
+      <button class="button button--quiet" id="pauseBtn" type="button">Пауза</button>
+      <button class="button button--quiet" id="muteBtn" type="button" aria-pressed="false">Звук: увімк.</button>
+      <a class="button button--quiet" href="../index.html">На головну</a>
+    </div>
+
+    <section class="viking-stage" id="stage" data-state="ready" aria-label="Ігрове поле">
+      <canvas id="field" width="960" height="640"></canvas>
+
+      <div class="viking" id="viking" aria-hidden="true">
+        <img class="viking__legs" id="vikingLegs" src="kara-vikinha/assets/viking-legs.png" alt="">
+        <img class="viking__top" src="kara-vikinha/assets/viking-top.png" alt="">
+      </div>
+
+      <div class="viking-alert" id="alert" hidden></div>
+
+      <div class="viking-overlay" id="ovStart">
+        <div class="viking-overlay__card">
+          <h2 class="viking-overlay__title">Кара вікінга</h2>
+          <p class="viking-overlay__text" id="intro"></p>
+          <ul class="viking-rules">
+            <li>Згори падають яблука з іменами, поняттями й пам’ятками Русі-України.</li>
+            <li>Ловіть кошиком лише ті, що належать до категорії з жовтої таблички. Чуже яблуко забирає очко.</li>
+            <li>Категорія змінюється кожні <span id="catSeconds">15</span> секунд — стежте за табличкою.</li>
+            <li>Керування: миша чи палець, або ← → (A/D). Пауза — Esc.</li>
+          </ul>
+          <div class="viking-overlay__buttons">
+            <button class="button" id="startBtn" type="button">Почати гру</button>
+            <a class="button button--quiet" href="../index.html">На головну</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="viking-overlay" id="ovPause" hidden>
+        <div class="viking-overlay__card">
+          <h2 class="viking-overlay__title">Пауза</h2>
+          <div class="viking-overlay__buttons">
+            <button class="button" id="resumeBtn" type="button">Продовжити</button>
+            <button class="button button--quiet" id="restartBtn" type="button">Почати заново</button>
+            <a class="button button--quiet" href="../index.html">На головну</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="viking-overlay" id="ovEnd" hidden>
+        <div class="viking-overlay__card">
+          <h2 class="viking-overlay__title">Слава Русі-Україні!</h2>
+          <p class="viking-overlay__text" id="endRating"></p>
+          <p class="viking-overlay__text" id="endStats"></p>
+          <p class="viking-overlay__text" id="endCoins"></p>
+          <div id="endMistakesBox" hidden>
+            <p class="viking-overlay__text"><b>Варто перечитати:</b></p>
+            <ul class="viking-mistakes" id="endMistakes"></ul>
+          </div>
+          <div class="rating" id="rateSlot"></div>
+          <div class="viking-overlay__buttons">
+            <button class="button" id="againBtn" type="button">Грати знову</button>
+            <a class="button button--quiet" href="../index.html">На головну</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <p class="viking-note" id="note" role="status" aria-live="polite">
+      Після кожного впійманого яблука тут з’явиться коротка довідка.
+    </p>
+    <p class="viking-hint">Кожне яблуко — вимога програми НМТ з теми 3 «Русь-Україна».</p>
+    <p class="viking-hint">Звуки — Kenney RPG Audio і StumpyStrust (OpenGameArt), CC0.</p>
+  </div>
+</main>
+
+<!-- «Архів»: візит сторінки й сесії гри (shared/js/analytics.js). -->
+<script src="../shared/js/analytics.js"></script>
+<script src="../data/arcade/kara-vikinha.js"></script>
+<script src="../data/games-registry.js"></script>
+<script src="../shared/js/wallet.js"></script>
+<script src="kara-vikinha/engine.js"></script>
+<script src="kara-vikinha/sounds.js"></script>
+<script src="kara-vikinha/sound.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var data = window.KARA_VIKINHA_DATA;
+
+  function $(id) { return document.getElementById(id); }
+
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) { node.className = className; }
+    if (text !== undefined && text !== null) { node.textContent = String(text); }
+    return node;
+  }
+
+  function fail(message) {
+    var box = el('p', 'status', message);
+    $('errorSlot').appendChild(box);
+    $('game').hidden = true;
+  }
+
+  if (!data || !window.KaraVikinha) {
+    fail('Не вдалося завантажити гру: бракує data/arcade/kara-vikinha.js або kara-vikinha/engine.js.');
+    return;
+  }
+
+  /* id гри — той самий у гаманці й аналітиці (CLAUDE.md: «registry id =
+     moduleId»). З головної приходить ?game=, пряме посилання бере типовий. */
+  var match = /[?&]game=([^&#]*)/.exec(window.location.search);
+  var gameId = match ? decodeURIComponent(match[1]) : data.topic + ':kara-vikinha';
+
+  var stage = $('stage');
+  var Sound = window.KaraVikinhaSound || null;
+  var MUTE_KEY = 'histgame_kara_vikinha_muted';
+  var HORN_SECONDS = 2.2;   // ріг триває 5 с, категорія — 15: гасимо раніше
+
+  function sfx(name, options) { if (Sound) { Sound.play(name, options); } }
+
+  /* Вимкнений звук пам'ятається між заходами; сховище може бути недоступне
+     (file://, приватний режим) — тоді лише на цю сесію. */
+  var muted = false;
+  try { muted = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) { /* лишаємо типове */ }
+
+  function renderMute() {
+    $('muteBtn').textContent = muted ? 'Звук: вимк.' : 'Звук: увімк.';
+    $('muteBtn').setAttribute('aria-pressed', String(muted));
+    if (Sound) { Sound.setMuted(muted); }
+  }
+  if (!Sound || !Sound.available()) { $('muteBtn').hidden = true; }
+  renderMute();
+  $('muteBtn').addEventListener('click', function () {
+    muted = !muted;
+    try { localStorage.setItem(MUTE_KEY, muted ? '1' : '0'); } catch (e) { /* лише на сесію */ }
+    renderMute();
+  });
+  var mistakes = {};
+  var alertTimer = null;
+  var sessionOpen = false;
+
+  $('intro').textContent = data.intro;
+  $('target').textContent = String(data.target);
+  $('catSeconds').textContent = String(data.categorySeconds);
+
+  function setState(state) {
+    stage.setAttribute('data-state', state);
+    $('ovStart').hidden = state !== 'ready';
+    $('ovPause').hidden = state !== 'paused';
+    $('ovEnd').hidden = state !== 'over';
+    $('pauseBtn').disabled = state !== 'play' && state !== 'paused';
+    $('pauseBtn').textContent = state === 'paused' ? 'Продовжити' : 'Пауза';
+  }
+
+  function showAlert(text) {
+    var box = $('alert');
+    box.textContent = text;
+    box.hidden = false;
+    if (alertTimer) { clearTimeout(alertTimer); }
+    alertTimer = setTimeout(function () { box.hidden = true; }, 1800);
+  }
+
+  function ratingText(score) {
+    for (var i = 0; i < data.ratings.length; i++) {
+      if (score >= data.ratings[i].min) { return data.ratings[i].text; }
+    }
+    return '';
+  }
+
+  function plural(n, forms) {
+    var a = Math.abs(n) % 100, b = a % 10;
+    if (a > 10 && a < 20) { return forms[2]; }
+    if (b > 1 && b < 5) { return forms[1]; }
+    if (b === 1) { return forms[0]; }
+    return forms[2];
+  }
+
+  KaraVikinha.init({
+    data: data,
+    canvasId: 'field',
+    stageId: 'stage',
+    vikingId: 'viking',
+    legsId: 'vikingLegs',
+    stillSrc: 'kara-vikinha/assets/viking-legs.png',
+    moveSrc: 'kara-vikinha/assets/viking-legs-move.gif',
+
+    onCategory: function (category) {
+      $('categoryName').textContent = category.name;
+      showAlert('Ловимо: ' + category.name);
+      sfx('category', { seconds: HORN_SECONDS });
+    },
+
+    onScore: function (st) {
+      $('correct').textContent = String(st.correct);
+      $('score').textContent = String(st.score);
+    },
+
+    /* Факт після кожного яблука — і правильного, і хибного: ефект гри
+       тримається на контекстній підтримці (docs/review-evidence.md, п. 1). */
+    onCatch: function (info) {
+      sfx(info.ok ? 'right' : 'wrong');
+      var note = $('note');
+      if (info.ok) {
+        note.setAttribute('data-kind', 'ok');
+        note.textContent = '✓ ' + info.item.label + ' — ' + info.item.note + '.';
+      } else {
+        note.setAttribute('data-kind', 'bad');
+        note.textContent = '✗ ' + info.item.label + ' — це «' + info.category.name
+          + '», а ловимо «' + info.current.name + '». ' + info.item.label + ' — '
+          + info.item.note + '.';
+        mistakes[info.item.req] = info;
+      }
+      if (window.HLGAnalytics) { HLGAnalytics.answer(info.item.req, info.ok); }
+    },
+
+    onMiss: function () { sfx('miss'); },
+
+    onPause: function (paused) {
+      setState(paused ? 'paused' : 'play');
+      if (Sound) { if (paused) { Sound.suspend(); } else { Sound.resume(); } }
+    },
+
+    onFinish: function (r) {
+      sfx('finish');
+      var total = r.correct + r.wrong;
+      $('endRating').textContent = ratingText(r.score);
+      $('endStats').textContent = 'Зловлено правильно: ' + r.correct + ', чужих: ' + r.wrong
+        + ', очки: ' + r.score + ', час: ' + r.seconds + ' с.';
+
+      /* Монети — шкалою за влучністю: скільки з упійманого було своїм. */
+      var gained = window.HLGWallet
+        ? HLGWallet.award(gameId, { score: r.correct, total: total })
+        : 0;
+      $('endCoins').textContent = gained
+        ? '+' + gained + ' ' + plural(gained, ['монета', 'монети', 'монет']) + '.'
+        : 'Монет не нараховано: потрібно, щоб щонайменше 70 % упійманого було своїм.';
+
+      var list = $('endMistakes');
+      while (list.firstChild) { list.removeChild(list.firstChild); }
+      var ids = Object.keys(mistakes);
+      ids.forEach(function (id) {
+        var m = mistakes[id];
+        list.appendChild(el('li', null, m.item.label + ' (' + m.category.name + ') — ' + m.item.note));
+      });
+      $('endMistakesBox').hidden = ids.length === 0;
+
+      if (window.HLGAnalytics && sessionOpen) {
+        HLGAnalytics.endSession({ score: r.correct, total: total, won: true, attempts: 1 });
+        sessionOpen = false;
+      }
+      if (window.HLGAnalytics) { HLGAnalytics.renderRating('rateSlot', gameId); }
+      setState('over');
+    }
+  });
+
+  function begin() {
+    /* Звук дозволено лише після жесту — begin() завжди кличе клік. */
+    if (Sound) { Sound.unlock(); Sound.resume(); }
+    mistakes = {};
+    $('note').removeAttribute('data-kind');
+    $('note').textContent = 'Після кожного впійманого яблука тут з’явиться коротка довідка.';
+    /* Перезапуск посеред гри — нова сесія; стара запишеться як покинута. */
+    if (window.HLGAnalytics) {
+      HLGAnalytics.startSession(gameId);
+      sessionOpen = true;
+    }
+    setState('play');
+    KaraVikinha.start();
+  }
+
+  $('startBtn').addEventListener('click', begin);
+  $('againBtn').addEventListener('click', begin);
+  $('restartBtn').addEventListener('click', begin);
+  $('resumeBtn').addEventListener('click', function () { KaraVikinha.resume(); });
+  $('pauseBtn').addEventListener('click', function () {
+    if (stage.getAttribute('data-state') === 'paused') { KaraVikinha.resume(); }
+    else { KaraVikinha.pause(); }
+  });
+
+  setState('ready');
+  window.karaVikinhaDebug = KaraVikinha.debug;
+})();
+</script>
+
+<!-- Коли з'являться — саме в цьому порядку (export.md E9):
+     nav.js -> analytics.js -> accessibility.js -->
+</body>
+</html>
