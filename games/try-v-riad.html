@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Три дати в ряд — Історія як гра</title>
+
+<!-- FOUC-guard. Копія docs/head-fragment.html — мусить бути інлайновим і
+     стояти ДО стилів, інакше темна тема блимає світлим (пастка N11). -->
+<script>
+  (function () {
+    'use strict';
+    try {
+      var root = document.documentElement;
+      if (localStorage.getItem('histgame_theme') === 'dark') {
+        root.setAttribute('data-theme-dark', '1');
+      }
+      var size = localStorage.getItem('histgame_fontsize');
+      if (size === 'lg') { root.classList.add('font-lg'); }
+      if (size === 'xl') { root.classList.add('font-xl'); }
+      if (localStorage.getItem('histgame_reducemotion') === '1') {
+        root.classList.add('reduce-motion');
+      }
+      if (localStorage.getItem('histgame_highcontrast') === '1') {
+        root.classList.add('high-contrast');
+      }
+    } catch (e) { /* приватний режим — лишаємо типову тему */ }
+  })();
+</script>
+
+<link rel="stylesheet" href="../shared/css/reset.css">
+<link rel="stylesheet" href="../shared/css/theme.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<style>
+  body { --game-accent: var(--color-accent-1); }
+
+  .page--m3 { max-width: 1040px; }
+
+  .m3-hud {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+  }
+  .m3-hud__box {
+    padding: var(--space-xs) var(--space-md);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-raised);
+  }
+  .m3-hud__label {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .m3-hud__value { font-size: var(--text-lg); font-weight: 700; }
+  .m3-hud .button { margin-left: auto; }
+
+  .m3-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 600px) minmax(0, 1fr);
+    gap: var(--space-md);
+    align-items: start;
+  }
+  @media (max-width: 860px) { .m3-layout { grid-template-columns: minmax(0, 1fr); } }
+
+  .m3-board {
+    width: 100%;
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    line-height: 0;
+  }
+  .m3-board canvas { display: block; touch-action: none; cursor: pointer; }
+
+  .panel { display: flex; flex-direction: column; gap: var(--space-sm); }
+  .panel__box {
+    padding: var(--space-sm) var(--space-md);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-raised);
+  }
+  .panel__title {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-xs);
+  }
+  .legend { display: flex; flex-direction: column; gap: var(--space-xs); font-size: var(--text-sm); }
+  .legend__row { display: flex; gap: var(--space-xs); align-items: baseline; }
+  .legend__dot { flex: none; width: 0.95em; height: 0.95em; border-radius: 4px; background: var(--dot); }
+  .legend--hidden .legend__dot { background: var(--color-border-strong); }
+  .chronicle { display: flex; flex-direction: column; gap: var(--space-xs); font-size: var(--text-sm); }
+  .chronicle__item { padding-left: var(--space-sm); border-left: 5px solid var(--dot, var(--color-border-strong)); }
+  .chronicle__item--bad { border-left-color: var(--color-danger); }
+  .chronicle__item:first-child { font-weight: 700; }
+
+  .m3-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-md);
+    background: rgba(13, 17, 23, 0.45);
+    z-index: 10;
+  }
+  .m3-overlay__card {
+    max-width: 40rem;
+    max-height: 100%;
+    overflow-y: auto;
+    padding: var(--space-md) var(--space-lg);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+    color: var(--color-text-primary);
+  }
+  .m3-overlay__title { font-size: var(--text-xl); margin-bottom: var(--space-sm); }
+  .m3-overlay__text { font-size: var(--text-base); margin-bottom: var(--space-sm); }
+  .m3-overlay__buttons { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-sm); }
+  .m3-list { margin: 0 0 var(--space-sm) 1.1rem; font-size: var(--text-sm); }
+  .m3-list li { margin-bottom: var(--space-xs); list-style: disc; }
+  .m3-modes { display: grid; gap: var(--space-xs); }
+  .m3-mode { text-align: left; }
+  .m3-mode small { display: block; font-weight: 400; font-size: var(--text-xs); }
+</style>
+</head>
+<body data-nav="overlay"
+      data-section="Ігри"
+      data-game-title="Три дати в ряд"
+      data-home-url="../index.html">
+
+<main class="page page--m3">
+  <header class="page__header">
+    <h1 class="page__title">Три дати в ряд</h1>
+    <p class="page__meta" id="pageMeta">Міняйте сусідні дати місцями: три дати однієї теми в ряд зникають.</p>
+  </header>
+
+  <div id="errorSlot"></div>
+
+  <div id="game">
+    <div class="m3-hud">
+      <div class="m3-hud__box">
+        <span class="m3-hud__label">Ходи</span>
+        <span class="m3-hud__value" id="moves">0</span>
+      </div>
+      <div class="m3-hud__box">
+        <span class="m3-hud__label">Клітинки</span>
+        <span class="m3-hud__value"><span id="cleared">0</span> / <span id="total">0</span></span>
+      </div>
+      <div class="m3-hud__box">
+        <span class="m3-hud__label">Режим</span>
+        <span class="m3-hud__value" id="modeName">—</span>
+      </div>
+      <button class="button button--quiet" id="hintBtn" type="button">Підказка</button>
+    </div>
+
+    <div class="m3-layout">
+      <div class="m3-board" id="boardWrap">
+        <canvas id="board" aria-label="Поле: дати, які треба складати по три в ряд"></canvas>
+      </div>
+      <aside class="panel">
+        <div class="panel__box">
+          <p class="panel__title">Теми</p>
+          <div class="legend" id="legend"></div>
+        </div>
+        <div class="panel__box">
+          <p class="panel__title">Хроніка</p>
+          <div class="chronicle" id="chronicle" role="status" aria-live="polite">
+            <p>Після кожної комбінації тут з’явиться, що сталося в ці роки.</p>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="m3-overlay" id="ovStart">
+    <div class="m3-overlay__card">
+      <h2 class="m3-overlay__title">Три дати в ряд</h2>
+      <p class="m3-overlay__text" id="introText"></p>
+      <ul class="m3-list">
+        <li>Поміняйте місцями дві сусідні дати (натисніть одну, потім іншу, або протягніть). Три й більше дат однієї теми в ряд чи стовпець зникають.</li>
+        <li>Комбінація над золотою клітинкою робить її срібною, над срібною — звичайною. Очистьте всі за <span id="introMoves">30</span> ходів.</li>
+        <li>Обмін без комбінації повертається і ходу не коштує. Після кожної комбінації — що сталося в ці роки.</li>
+      </ul>
+      <p class="m3-overlay__text"><b>Режим:</b></p>
+      <div class="m3-modes" id="modes"></div>
+    </div>
+  </div>
+
+  <div class="m3-overlay" id="ovEnd" hidden>
+    <div class="m3-overlay__card">
+      <h2 class="m3-overlay__title" id="endTitle">Поле розчищено</h2>
+      <p class="m3-overlay__text" id="endRating"></p>
+      <p class="m3-overlay__text" id="endStats"></p>
+      <p class="m3-overlay__text" id="endCoins"></p>
+      <div id="endFactsBox" hidden>
+        <p class="m3-overlay__text"><b>Дати, що траплялися в комбінаціях:</b></p>
+        <ul class="m3-list" id="endFacts"></ul>
+      </div>
+      <div class="rating" id="rateSlot"></div>
+      <div class="m3-overlay__buttons">
+        <button class="button" id="againBtn" type="button">Грати знову</button>
+        <a class="button button--quiet" href="../index.html">На головну</a>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- «Архів»: візит сторінки й сесії гри (shared/js/analytics.js). -->
+<script src="../shared/js/analytics.js"></script>
+<script src="../data/arcade/try-v-riad.js"></script>
+<script src="../data/facts/_schema.js"></script>
+<script src="../data/facts/_templates.js"></script>
+<script src="../data/facts/_index.js"></script>
+<script src="../shared/js/facts-adapter.js"></script>
+<script src="../data/games-registry.js"></script>
+<script src="../shared/js/wallet.js"></script>
+<script src="try-v-riad/engine.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var data = window.TRY_V_RIAD_DATA;
+  var SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+  function $(id) { return document.getElementById(id); }
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) { node.className = className; }
+    if (text !== undefined && text !== null) { node.textContent = String(text); }
+    return node;
+  }
+  function param(name) {
+    var m = new RegExp('[?&]' + name + '=([^&#]*)').exec(window.location.search);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+  function showError(text) {
+    $('errorSlot').appendChild(el('p', 'status', text));
+    $('game').hidden = true;
+    $('ovStart').hidden = true;
+  }
+  function plural(n, forms) {
+    var a = Math.abs(n) % 100, b = a % 10;
+    if (a > 10 && a < 20) { return forms[2]; }
+    if (b > 1 && b < 5) { return forms[1]; }
+    if (b === 1) { return forms[0]; }
+    return forms[2];
+  }
+
+  if (!data || !window.TryVRiad || !window.FactsAdapter) {
+    showError('Не вдалося завантажити гру: бракує data/arcade/try-v-riad.js, try-v-riad/engine.js або shared/js/facts-adapter.js.');
+    return;
+  }
+
+  /* id гри — той самий у гаманці й аналітиці (CLAUDE.md: «registry id = moduleId»). */
+  var gameId = param('game') || 'try-v-riad';
+  var slugs = param('facts') ? param('facts').split(',') : data.defaultTopics.slice();
+  for (var k = 0; k < slugs.length; k++) {
+    if (!SLUG_RE.test(slugs[k])) { showError('Недопустима назва теми: ' + slugs[k]); return; }
+  }
+
+  /* Теми вантажаться <script src> по черзі, не fetch: інакше не працюватиме
+     з file:// (export.md B2). */
+  var loaded = 0;
+  var failed = false;
+  slugs.forEach(function (slug) {
+    var loader = document.createElement('script');
+    loader.src = '../data/facts/' + slug + '.js';
+    loader.onload = function () {
+      loaded += 1;
+      if (loaded === slugs.length && !failed) { build(); }
+    };
+    loader.onerror = function () {
+      failed = true;
+      showError('Не знайдено файл теми data/facts/' + slug + '.js — запустіть python tools/facts-build.py --all.');
+    };
+    document.head.appendChild(loader);
+  });
+
+  var topics = [];
+  var mode = 'easy';
+  var seen = {};
+  var sessionOpen = false;
+
+  function topicNumber(slug) { return slug.slice(0, 2); }
+
+  function build() {
+    slugs.forEach(function (slug) {
+      var set = FactsAdapter.toTiles(slug, { types: ['DATE'] });
+      if (!set || !set.tiles.length) { return; }
+      topics.push({
+        slug: slug,
+        name: topicNumber(slug),
+        title: set.title,
+        color: data.palette[topics.length % data.palette.length],
+        tiles: set.tiles
+      });
+    });
+    if (topics.length < 3) {
+      showError('Для гри потрібно щонайменше три теми з датами; знайдено ' + topics.length + '.');
+      return;
+    }
+
+    $('pageMeta').textContent = 'Теми ' + topics.map(function (t) { return t.name; }).join(', ')
+      + ' · міняйте сусідні дати: три дати однієї теми в ряд зникають.';
+    $('introText').textContent = 'На фішках — дати з тем '
+      + topics.map(function (t) { return t.name; }).join(', ')
+      + '. Колір фішки — тема. Складайте по три дати однієї теми в ряд.';
+    $('introMoves').textContent = String(data.moves);
+
+    data.modes.forEach(function (m) {
+      var b = el('button', 'button m3-mode');
+      b.type = 'button';
+      b.appendChild(document.createTextNode(m.name));
+      b.appendChild(el('small', null, m.text));
+      b.addEventListener('click', function () { begin(m); });
+      $('modes').appendChild(b);
+    });
+
+    TryVRiad.init({
+      canvasId: 'board',
+      topics: topics,
+      mask: data.mask,
+      moves: data.moves,
+      mode: mode,
+
+      onMatch: function (info) {
+        var unique = {};
+        info.tiles.forEach(function (tile) {
+          if (unique[tile.id]) { return; }
+          unique[tile.id] = true;
+          seen[tile.id] = tile;
+          if (info.byPlayer && window.HLGAnalytics && tile.req) { HLGAnalytics.answer(tile.req, true); }
+        });
+        var first = info.tiles[0];
+        var t = topics[first.t];
+        var head = info.byPlayer ? '' : 'Каскад ×' + info.chain + '. ';
+        chronicle(head + 'Тема ' + t.name + ': ' + first.fact, t.color, false);
+      },
+
+      onInvalid: function (info) {
+        var t = topics[info.a.t];
+        chronicle('Ряду немає. «' + info.a.label + '» — тема ' + t.name + ': ' + info.a.fact,
+                  mode === 'impossible' ? null : t.color, true);
+        /* У простому режимі обмін веде колір, а не знання, — в аналітику не пишемо. */
+        if (mode !== 'easy' && window.HLGAnalytics && info.a.req) { HLGAnalytics.answer(info.a.req, false); }
+      },
+
+      onChange: function (st) {
+        $('moves').textContent = String(st.moves);
+        $('cleared').textContent = String(st.cleared);
+        $('total').textContent = String(st.total);
+      },
+
+      onReshuffle: function () {
+        chronicle('Ходів не лишилося — дати перемішано.', null, false);
+      },
+
+      onFinish: function (r) {
+        var ratio = r.total ? r.cleared / r.total : 0;
+        var text = '';
+        for (var i = 0; i < data.ratings.length; i++) {
+          if (ratio >= data.ratings[i].min) { text = data.ratings[i].text; break; }
+        }
+        $('endTitle').textContent = r.won ? 'Поле розчищено' : 'Ходи скінчилися';
+        $('endRating').textContent = text;
+        $('endStats').textContent = 'Клітинок: ' + r.cleared + ' з ' + r.total
+          + ', ходів: ' + r.movesUsed + ', комбінацій: ' + r.matches
+          + ', обмінів без ряду: ' + r.invalid + ', підказок: ' + r.hints
+          + ', режим: ' + modeName(mode).toLowerCase() + ', час: ' + r.seconds + ' с.';
+
+        var gained = window.HLGWallet ? HLGWallet.award(gameId, { score: r.cleared, total: r.total }) : 0;
+        $('endCoins').textContent = gained
+          ? '+' + gained + ' ' + plural(gained, ['монета', 'монети', 'монет']) + '.'
+          : 'Монет не нараховано: потрібно очистити щонайменше 70 % клітинок.';
+
+        var list = $('endFacts');
+        while (list.firstChild) { list.removeChild(list.firstChild); }
+        var ids = Object.keys(seen);
+        ids.sort(function (a, b) { return seen[a].t - seen[b].t; });
+        ids.forEach(function (id) {
+          list.appendChild(el('li', null, 'Тема ' + topics[seen[id].t].name + ': ' + seen[id].fact));
+        });
+        $('endFactsBox').hidden = ids.length === 0;
+
+        if (window.HLGAnalytics && sessionOpen) {
+          HLGAnalytics.endSession({ score: r.cleared, total: r.total, won: r.won, attempts: 1 });
+          sessionOpen = false;
+        }
+        if (window.HLGAnalytics) { HLGAnalytics.renderRating('rateSlot', gameId); }
+        $('ovEnd').hidden = false;
+      }
+    });
+    renderLegend();
+  }
+
+  function modeName(id) {
+    for (var i = 0; i < data.modes.length; i++) { if (data.modes[i].id === id) { return data.modes[i].name; } }
+    return id;
+  }
+
+  function renderLegend() {
+    var box = $('legend');
+    while (box.firstChild) { box.removeChild(box.firstChild); }
+    box.classList.toggle('legend--hidden', mode === 'impossible');
+    topics.forEach(function (t) {
+      var row = el('div', 'legend__row');
+      var dot = el('span', 'legend__dot');
+      dot.style.setProperty('--dot', t.color);
+      row.appendChild(dot);
+      row.appendChild(el('span', null, t.name + ' · ' + t.title));
+      box.appendChild(row);
+    });
+  }
+
+  function chronicle(text, color, bad) {
+    var box = $('chronicle');
+    var item = el('p', 'chronicle__item' + (bad ? ' chronicle__item--bad' : ''), text);
+    if (color) { item.style.setProperty('--dot', color); }
+    if (box.firstChild && box.firstChild.tagName === 'P' && !box.firstChild.className) {
+      box.removeChild(box.firstChild);
+    }
+    box.insertBefore(item, box.firstChild);
+    while (box.children.length > 6) { box.removeChild(box.lastChild); }
+  }
+
+  function begin(m) {
+    if (m) { mode = m.id; }
+    TryVRiad.setMode(mode);
+    $('modeName').textContent = modeName(mode);
+    renderLegend();
+    seen = {};
+    var box = $('chronicle');
+    while (box.firstChild) { box.removeChild(box.firstChild); }
+    box.appendChild(el('p', null, 'Після кожної комбінації тут з’явиться, що сталося в ці роки.'));
+    if (window.HLGAnalytics) { HLGAnalytics.startSession(gameId); sessionOpen = true; }
+    $('ovStart').hidden = true;
+    $('ovEnd').hidden = true;
+    TryVRiad.start();
+  }
+
+  $('hintBtn').addEventListener('click', function () { TryVRiad.hint(); });
+  $('againBtn').addEventListener('click', function () {
+    $('ovEnd').hidden = true;
+    $('ovStart').hidden = false;
+  });
+  window.tryVRiadDebug = TryVRiad.debug;
+})();
+</script>
+</body>
+</html>

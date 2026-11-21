@@ -525,6 +525,43 @@
     };
   }
 
+  /* --- TILES --------------------------------------------------------------
+
+     Фішки для ігор, де факт — це предмет на полі, а не питання («Три дати в
+     ряд»): label — коротка мітка (для DATE — рік без «р.»/«рр.»), fact —
+     повне речення для показу ПІСЛЯ дії, req — вимога програми для аналітики.
+       FactsAdapter.toTiles('04-halytsko-volynska-derzhava', { types: ['DATE'] })
+       -> { slug, title, tiles: [{ id, label, fact, req }] }  або null */
+  function toTiles(slug, opts) {
+    opts = opts || {};
+    var topic = getTopic(slug);
+    if (!topic) { return null; }
+
+    var random = makeRandom(opts.seed);
+    var pool = applyFilters(renderablePool(topic, true), opts);
+    var chosen = take(shuffled(pool, random), opts.count);
+    if (!chosen.length) {
+      warn('після фільтрів не лишилося жодного факту для теми "' + slug + '"');
+      return null;
+    }
+    return {
+      slug: slug,
+      title: topic.title,
+      tiles: chosen.map(function (fact) {
+        var label = String(fact.object);
+        if (fact.type === 'DATE') {
+          label = label.replace(/\s*(рр|р)\.?\s*$/, '');
+        }
+        return {
+          id: slug + ':' + fact.id,
+          label: label,
+          fact: fact.fact,
+          req: (fact.requires && fact.requires[0]) || null
+        };
+      })
+    };
+  }
+
   /* --- TIMELINE -----------------------------------------------------------
 
      Порядок задає позиція в масиві, а не парсинг року (контракт E3): рік
@@ -674,6 +711,7 @@
   window.FactsAdapter = {
     toQuiz: toQuiz,
     toFalling: toFalling,
+    toTiles: toTiles,
     toTimeline: toTimeline,
     toOddOneOut: toOddOneOut,
     toCards: toCards,
