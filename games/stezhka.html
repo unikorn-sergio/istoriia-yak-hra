@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Стежка — Історія як гра</title>
+
+<!-- FOUC-guard. Копія docs/head-fragment.html — мусить бути інлайновим і
+     стояти ДО стилів, інакше темна тема блимає світлим (пастка N11). -->
+<script>
+  (function () {
+    'use strict';
+    try {
+      var root = document.documentElement;
+      if (localStorage.getItem('histgame_theme') === 'dark') {
+        root.setAttribute('data-theme-dark', '1');
+      }
+      var size = localStorage.getItem('histgame_fontsize');
+      if (size === 'lg') { root.classList.add('font-lg'); }
+      if (size === 'xl') { root.classList.add('font-xl'); }
+      if (localStorage.getItem('histgame_reducemotion') === '1') {
+        root.classList.add('reduce-motion');
+      }
+      if (localStorage.getItem('histgame_highcontrast') === '1') {
+        root.classList.add('high-contrast');
+      }
+    } catch (e) { /* приватний режим — лишаємо типову тему */ }
+  })();
+</script>
+
+<link rel="stylesheet" href="../shared/css/reset.css">
+<link rel="stylesheet" href="../shared/css/theme.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<style>
+  body { --game-accent: var(--color-accent-1); }
+
+  .page--path { max-width: 820px; }
+
+  .path-hud {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+  }
+  .path-hud__box {
+    padding: var(--space-xs) var(--space-md);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-raised);
+  }
+  .path-hud__label {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .path-hud__value { font-size: var(--text-lg); font-weight: 700; }
+  .path-hud .button { margin-left: auto; align-self: center; }
+
+  .path-task { font-size: var(--text-base); margin-bottom: var(--space-sm); }
+
+  /* Мапа: початок, мережа, кінець; SVG ліній лежить під вузлами. */
+  .map {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+  }
+  .map__lines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .map__lines .link {
+    stroke: var(--color-border-strong);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 5;
+  }
+  .map__lines .trail {
+    stroke: var(--color-success);
+    stroke-width: 5;
+    stroke-linecap: round;
+  }
+
+  .stezhka-end {
+    position: relative;
+    z-index: 1;
+    padding: var(--space-xs) var(--space-md);
+    border: 2px solid var(--color-ink);
+    border-radius: 999px;
+    background: var(--block-2-bg, var(--color-surface-strong));
+    font-weight: 700;
+    font-size: var(--text-sm);
+    text-align: center;
+  }
+  .stezhka-end--reached { box-shadow: 0 0 0 4px var(--color-success); }
+
+  .network {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+    gap: var(--space-md) var(--space-lg);
+  }
+  .node {
+    min-height: 3.6rem;
+    padding: var(--space-xs) var(--space-sm);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-raised);
+    color: var(--color-text-primary);
+    font-size: var(--text-sm);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    hyphens: auto;
+    cursor: pointer;
+  }
+  .node:hover:not(:disabled) { background: var(--color-surface-strong); }
+  .node:focus-visible { outline: 3px solid var(--color-accent-1); outline-offset: 2px; }
+  .node:disabled { cursor: default; }
+  .node--ok { background: #d6ead2; color: #14321d; border-color: #1d5e33; font-weight: 700; }
+  .node--bad { background: #f1d3cd; color: #5a1a10; border-style: dashed; opacity: 0.75; }
+  .node--hint { box-shadow: 0 0 0 5px #e0b52b, 0 0 18px 6px rgba(224, 181, 43, 0.6); }
+  .node--early { animation: shake 0.4s; border-color: var(--color-danger); }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+  .reduce-motion .node--early { animation: none; }
+
+  .path-note {
+    margin-top: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-raised);
+    font-size: var(--text-base);
+  }
+  .path-note[data-kind="ok"] { border-left: 8px solid var(--color-success); }
+  .path-note[data-kind="bad"] { border-left: 8px solid var(--color-danger); }
+
+  @media (max-width: 560px) {
+    .network { gap: var(--space-sm); }
+    .node { font-size: var(--text-xs); min-height: 3rem; }
+  }
+
+  .path-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-md);
+    background: rgba(13, 17, 23, 0.45);
+    z-index: 10;
+  }
+  .path-overlay__card {
+    max-width: 38rem;
+    max-height: 100%;
+    overflow-y: auto;
+    padding: var(--space-md) var(--space-lg);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+    color: var(--color-text-primary);
+  }
+  .path-overlay__title { font-size: var(--text-xl); margin-bottom: var(--space-sm); }
+  .path-overlay__text { font-size: var(--text-base); margin-bottom: var(--space-sm); }
+  .path-overlay__buttons { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-sm); }
+  .path-list { margin: 0 0 var(--space-sm) 1.1rem; font-size: var(--text-sm); }
+  .path-list li { margin-bottom: var(--space-xs); list-style: disc; }
+</style>
+</head>
+<body data-nav="overlay"
+      data-section="Ігри"
+      data-game-title="Стежка"
+      data-home-url="../index.html">
+
+<main class="page page--path">
+  <header class="page__header">
+    <h1 class="page__title" id="pageTitle">Стежка</h1>
+    <p class="page__meta" id="pageMeta">Прокладіть стежку від початку до кінця.</p>
+  </header>
+
+  <div id="errorSlot"></div>
+
+  <div id="game">
+    <div class="path-hud">
+      <div class="path-hud__box">
+        <span class="path-hud__label">Кроки</span>
+        <span class="path-hud__value"><span id="steps">0</span> / <span id="total">0</span></span>
+      </div>
+      <div class="path-hud__box">
+        <span class="path-hud__label">Життя</span>
+        <span class="path-hud__value" id="lives" aria-live="polite">♥♥♥</span>
+      </div>
+      <button class="button button--quiet" id="hintBtn" type="button">🌹 Підказка: <span id="hints">3</span></button>
+    </div>
+
+    <p class="path-task" id="task"></p>
+
+    <section class="map" id="map" aria-label="Мережа стежки">
+      <svg class="map__lines" id="lines" aria-hidden="true"></svg>
+      <div class="stezhka-end" id="start"></div>
+      <div class="network" id="network"></div>
+      <div class="stezhka-end" id="finish"></div>
+    </section>
+
+    <p class="path-note" id="note" role="status" aria-live="polite">
+      Після кожного кроку тут з’явиться, що це за подія і коли вона була.
+    </p>
+  </div>
+
+  <div class="path-overlay" id="ovStart">
+    <div class="path-overlay__card">
+      <h2 class="path-overlay__title" id="introTitle">Стежка</h2>
+      <p class="path-overlay__text" id="introTask"></p>
+      <ul class="path-list">
+        <li>Натискайте вузли по черзі — від початку до кінця. Роки не підписано: порядок треба знати.</li>
+        <li>Серед вузлів є чужі — з інших тем і діб. Чужий вузол або крок не за чергою забирає життя, їх три.</li>
+        <li>🌹 Підказка на мить підсвічує наступний крок — тричі за стежку.</li>
+      </ul>
+      <button class="button" id="startBtn" type="button">Почати</button>
+    </div>
+  </div>
+
+  <div class="path-overlay" id="ovEnd" hidden>
+    <div class="path-overlay__card">
+      <h2 class="path-overlay__title" id="endTitle">Стежку пройдено</h2>
+      <p class="path-overlay__text" id="endRating"></p>
+      <p class="path-overlay__text" id="endStats"></p>
+      <p class="path-overlay__text" id="endCoins"></p>
+      <div id="endMistakesBox" hidden>
+        <p class="path-overlay__text"><b>Варто перечитати:</b></p>
+        <ul class="path-list" id="endMistakes"></ul>
+      </div>
+      <div class="rating" id="rateSlot"></div>
+      <div class="path-overlay__buttons">
+        <button class="button" id="againBtn" type="button">Нова стежка</button>
+        <a class="button button--quiet" href="../index.html">На головну</a>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- «Архів»: візит сторінки й сесії гри (shared/js/analytics.js). -->
+<script src="../shared/js/analytics.js"></script>
+<script src="../data/arcade/stezhka.js"></script>
+<script src="../data/games-registry.js"></script>
+<script src="../shared/js/wallet.js"></script>
+<script src="stezhka/game.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var data = window.STEZHKA_DATA;
+  function $(id) { return document.getElementById(id); }
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) { node.className = className; }
+    if (text !== undefined && text !== null) { node.textContent = String(text); }
+    return node;
+  }
+  function param(name) {
+    var m = new RegExp('[?&]' + name + '=([^&#]*)').exec(window.location.search);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  if (!data || !window.Stezhka) {
+    $('errorSlot').appendChild(el('p', 'status',
+      'Не вдалося завантажити гру: бракує data/arcade/stezhka.js або stezhka/game.js.'));
+    $('game').hidden = true;
+    $('ovStart').hidden = true;
+    return;
+  }
+
+  var topicSlug = param('topic') || '01-vstup';
+  var topic = data.topics[topicSlug];
+  if (!topic) {
+    $('errorSlot').appendChild(el('p', 'status',
+      'Для теми «' + topicSlug + '» стежок ще немає. Є: ' + Object.keys(data.topics).join(', ') + '.'));
+    $('game').hidden = true;
+    $('ovStart').hidden = true;
+    return;
+  }
+
+  /* id гри — той самий у гаманці й аналітиці (CLAUDE.md: «registry id = moduleId»). */
+  var gameId = param('game') || topicSlug + ':stezhka';
+  var pathIndex = Math.floor(Math.random() * topic.paths.length);
+  var path = null;
+  var mistakes = [];
+  var sessionOpen = false;
+
+  function hearts(n) {
+    var out = '';
+    for (var i = 0; i < data.lives; i++) { out += i < n ? '♥' : '♡'; }
+    return out;
+  }
+
+  function plural(n, forms) {
+    var a = Math.abs(n) % 100, b = a % 10;
+    if (a > 10 && a < 20) { return forms[2]; }
+    if (b > 1 && b < 5) { return forms[1]; }
+    if (b === 1) { return forms[0]; }
+    return forms[2];
+  }
+
+  function note(kind, text) {
+    $('note').setAttribute('data-kind', kind);
+    $('note').textContent = text;
+  }
+
+  $('pageMeta').textContent = topic.title + ' · прокладіть стежку від початку до кінця.';
+
+  Stezhka.init({
+    wrapId: 'map', networkId: 'network', svgId: 'lines',
+    startId: 'start', finishId: 'finish',
+    lives: data.lives, hints: data.hints, cols: data.cols,
+
+    /* Факт одразу після кожного кроку — і правильного, і хибного
+       (docs/review-evidence.md, п. 1: ефект тримається на підтримці). */
+    onStep: function (info) {
+      $('steps').textContent = String(info.index + 1);
+      note('ok', '✓ ' + info.step.note);
+      if (window.HLGAnalytics) { HLGAnalytics.answer(info.step.req, true); }
+    },
+
+    onMistake: function (info) {
+      $('lives').textContent = hearts(info.lives);
+      if (info.kind === 'decoy') {
+        note('bad', '✗ Не з цієї стежки. ' + info.item.note);
+        mistakes.push(info.item.label + ': ' + info.item.note);
+        if (window.HLGAnalytics) { HLGAnalytics.answer('stezhka:' + info.item.id, false); }
+      } else {
+        note('bad', '✗ «' + info.item.label + '» — теж на цій стежці, але пізніше. Спершу знайдіть попередній крок.');
+        mistakes.push(info.item.label + ': ' + info.item.note);
+        if (window.HLGAnalytics) { HLGAnalytics.answer(info.item.req, false); }
+      }
+    },
+
+    onFinish: function (r) {
+      /* Влучність: кроки з усіх натискань. Без помилок — 100 %. */
+      var attempts = r.steps + r.mistakes;
+      var ratio = attempts ? r.steps / attempts : 0;
+      if (!r.won) { ratio = 0; }
+      var text = '';
+      for (var i = 0; i < data.ratings.length; i++) {
+        if (ratio >= data.ratings[i].min) { text = data.ratings[i].text; break; }
+      }
+      $('endTitle').textContent = r.won ? 'Стежку пройдено' : 'Життя скінчилися';
+      $('endRating').textContent = text;
+      $('endStats').textContent = 'Кроків: ' + r.steps + ' з ' + r.total
+        + ', помилок: ' + r.mistakes + ', підказок: ' + r.hintsUsed + ', час: ' + r.seconds + ' с.';
+
+      var score = r.steps;
+      var total = r.won ? attempts : r.total + r.mistakes;
+      var gained = window.HLGWallet ? HLGWallet.award(gameId, { score: score, total: total }) : 0;
+      $('endCoins').textContent = gained
+        ? '+' + gained + ' ' + plural(gained, ['монета', 'монети', 'монет']) + '.'
+        : 'Монет не нараховано: потрібно дійти до кінця, і щоб щонайменше 70 % натискань були кроками стежки.';
+
+      var list = $('endMistakes');
+      while (list.firstChild) { list.removeChild(list.firstChild); }
+      mistakes.forEach(function (m) { list.appendChild(el('li', null, m)); });
+      $('endMistakesBox').hidden = mistakes.length === 0;
+
+      if (window.HLGAnalytics && sessionOpen) {
+        HLGAnalytics.endSession({ score: score, total: total, won: r.won, attempts: 1 });
+        sessionOpen = false;
+      }
+      if (window.HLGAnalytics) { HLGAnalytics.renderRating('rateSlot', gameId); }
+      $('ovEnd').hidden = false;
+    }
+  });
+
+  function showIntro() {
+    path = topic.paths[pathIndex % topic.paths.length];
+    $('introTitle').textContent = path.title;
+    $('introTask').textContent = path.task;
+  }
+
+  function begin() {
+    path = topic.paths[pathIndex % topic.paths.length];
+    mistakes = [];
+    $('pageTitle').textContent = 'Стежка: ' + path.title.charAt(0).toLowerCase() + path.title.slice(1);
+    $('task').textContent = path.task;
+    $('steps').textContent = '0';
+    $('total').textContent = String(path.steps.length);
+    $('lives').textContent = hearts(data.lives);
+    $('hints').textContent = String(data.hints);
+    $('hintBtn').disabled = false;
+    $('note').removeAttribute('data-kind');
+    $('note').textContent = 'Після кожного кроку тут з’явиться, що це за подія і коли вона була.';
+    if (window.HLGAnalytics) { HLGAnalytics.startSession(gameId); sessionOpen = true; }
+    $('ovStart').hidden = true;
+    $('ovEnd').hidden = true;
+    Stezhka.start(path);
+  }
+
+  $('hintBtn').addEventListener('click', function () {
+    var left = Stezhka.hint();
+    if (left === false) { return; }
+    $('hints').textContent = String(left);
+    if (left === 0) { $('hintBtn').disabled = true; }
+  });
+  $('startBtn').addEventListener('click', begin);
+  /* «Нова стежка» бере наступну стежку теми, якщо їх кілька. */
+  $('againBtn').addEventListener('click', function () { pathIndex += 1; begin(); });
+
+  showIntro();
+  window.stezhkaDebug = Stezhka.debug;
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Таємниці скарбниці — Історія як гра</title>
+
+<!-- FOUC-guard. Копія docs/head-fragment.html — мусить бути інлайновим і
+     стояти ДО стилів, інакше темна тема блимає світлим (пастка N11). -->
+<script>
+  (function () {
+    'use strict';
+    try {
+      var root = document.documentElement;
+      if (localStorage.getItem('histgame_theme') === 'dark') {
+        root.setAttribute('data-theme-dark', '1');
+      }
+      var size = localStorage.getItem('histgame_fontsize');
+      if (size === 'lg') { root.classList.add('font-lg'); }
+      if (size === 'xl') { root.classList.add('font-xl'); }
+      if (localStorage.getItem('histgame_reducemotion') === '1') {
+        root.classList.add('reduce-motion');
+      }
+      if (localStorage.getItem('histgame_highcontrast') === '1') {
+        root.classList.add('high-contrast');
+      }
+    } catch (e) { /* приватний режим — лишаємо типову тему */ }
+  })();
+</script>
+
+<link rel="stylesheet" href="../shared/css/reset.css">
+<link rel="stylesheet" href="../shared/css/theme.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<style>
+  body { --game-accent: var(--color-accent-1); }
+
+  .page--vault { max-width: 1100px; }
+
+  .vault-hud {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+  }
+  .vault-hud__box {
+    padding: var(--space-xs) var(--space-md);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-raised);
+  }
+  .vault-hud__label {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .vault-hud__value { font-size: var(--text-lg); font-weight: 700; }
+  .vault-hud__actions { margin-left: auto; display: flex; gap: var(--space-sm); flex-wrap: wrap; }
+
+  .vault-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 270px;
+    gap: var(--space-md);
+    align-items: start;
+  }
+  @media (max-width: 860px) { .vault-layout { grid-template-columns: minmax(0, 1fr); } }
+
+  /* Скарбниця. Дерево й мідь — предмет, а не інтерфейс: у темній темі
+     скриня лишається скринею. */
+  .cells {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: #5b3b22;
+  }
+  .cell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 268px;
+    padding: 22px 6px 6px;
+    border: 2px solid #2e1d10;
+    border-radius: var(--radius-md);
+    background: linear-gradient(#7a5233, #6a4529);
+    cursor: pointer;
+    touch-action: pan-y; /* прокрутка сторінки лишається; натискання й бокове перетягування — гра */
+    user-select: none;
+  }
+  .cell:focus-visible { outline: 3px solid #f2c14e; outline-offset: 2px; }
+  .cell--selected { box-shadow: 0 0 0 4px #f2c14e; }
+  .cell--ok { box-shadow: 0 0 0 4px #4caf6a; }
+  .cell--bad { animation: shake 0.4s; box-shadow: 0 0 0 4px #d9534f; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+  .reduce-motion .cell--bad { animation: none; }
+  .cell__count {
+    position: absolute;
+    top: 3px;
+    right: 8px;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: #f3e3c7;
+  }
+  .cell__stack {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 3px;
+  }
+  .coin {
+    min-height: 26px;
+    padding: 3px 6px;
+    border: 2px solid #8c6a1f;
+    border-radius: 999px;
+    background: #e9d08a;
+    color: #2b2108;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    line-height: 1.15;
+    text-align: center;
+    overflow-wrap: anywhere;
+    pointer-events: none;
+  }
+  .coin--known {
+    background: var(--coin);
+    border-color: rgba(0, 0, 0, 0.35);
+    color: #fff;
+  }
+  .coin--hidden { background: #8a7a5a; border-style: dashed; color: #f3e3c7; }
+  .coin--lifted { transform: translateY(-4px); box-shadow: 0 0 0 2px #f2c14e; }
+
+  .ghost {
+    position: fixed;
+    z-index: 20;
+    padding: 4px 10px;
+    border: 2px solid #8c6a1f;
+    border-radius: 999px;
+    background: #e9d08a;
+    color: #2b2108;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    pointer-events: none;
+  }
+
+  .panel { display: flex; flex-direction: column; gap: var(--space-sm); }
+  .panel__box {
+    padding: var(--space-sm) var(--space-md);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-raised);
+  }
+  .panel__title {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-xs);
+  }
+  .legend { display: flex; flex-direction: column; gap: var(--space-xs); font-size: var(--text-sm); }
+  .legend__row { display: flex; gap: var(--space-xs); align-items: baseline; }
+  .legend__dot { flex: none; width: 0.9em; height: 0.9em; border-radius: 50%; background: var(--coin); }
+  .legend__hint { color: var(--color-text-secondary); font-size: var(--text-xs); }
+  .panel__note { font-size: var(--text-base); }
+  .panel__note[data-kind="ok"] { border-left: 6px solid var(--color-success); padding-left: var(--space-sm); }
+  .panel__note[data-kind="bad"] { border-left: 6px solid var(--color-danger); padding-left: var(--space-sm); }
+
+  @media (max-width: 560px) {
+    .cells { gap: 5px; padding: 5px; }
+    .cell { padding: 20px 3px 3px; min-height: 250px; }
+    .coin { font-size: 0.62rem; padding: 2px 3px; }
+  }
+
+  .vault-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-md);
+    background: rgba(13, 17, 23, 0.45);
+    z-index: 10;
+  }
+  .vault-overlay__card {
+    max-width: 38rem;
+    max-height: 100%;
+    overflow-y: auto;
+    padding: var(--space-md) var(--space-lg);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+    color: var(--color-text-primary);
+  }
+  .vault-overlay__title { font-size: var(--text-xl); margin-bottom: var(--space-sm); }
+  .vault-overlay__text { font-size: var(--text-base); margin-bottom: var(--space-sm); }
+  .vault-overlay__buttons { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-sm); }
+  .vault-list { margin: 0 0 var(--space-sm) 1.1rem; font-size: var(--text-sm); }
+  .vault-list li { margin-bottom: var(--space-xs); list-style: disc; }
+</style>
+</head>
+<body data-nav="overlay"
+      data-section="Ігри"
+      data-game-title="Таємниці скарбниці"
+      data-home-url="../index.html">
+
+<main class="page page--vault">
+  <header class="page__header">
+    <h1 class="page__title">Таємниці скарбниці</h1>
+    <p class="page__meta">Вступ до історії України · розкладіть монети-джерела по скарбничках.</p>
+  </header>
+
+  <div id="errorSlot"></div>
+
+  <div id="game">
+    <div class="vault-hud">
+      <div class="vault-hud__box">
+        <span class="vault-hud__label">Очки</span>
+        <span class="vault-hud__value"><span id="score">0</span> / <span id="target">30</span></span>
+      </div>
+      <div class="vault-hud__box">
+        <span class="vault-hud__label">Відскочило</span>
+        <span class="vault-hud__value" id="mistakes">0</span>
+      </div>
+      <div class="vault-hud__actions">
+        <button class="button" id="dealBtn" type="button">Роздати монети</button>
+        <button class="button button--quiet" id="stopBtn" type="button">Завершити</button>
+      </div>
+    </div>
+
+    <div class="vault-layout">
+      <section aria-label="Скарбнички">
+        <div class="cells" id="cells"></div>
+      </section>
+
+      <aside class="panel" aria-label="Види джерел">
+        <div class="panel__box">
+          <p class="panel__title">Види джерел</p>
+          <div class="legend" id="legend"></div>
+        </div>
+        <div class="panel__box">
+          <p class="panel__title">Шість однакових перетворюються на</p>
+          <p class="legend__hint" id="chain"></p>
+        </div>
+        <div class="panel__box">
+          <p class="panel__title">Довідка</p>
+          <p class="panel__note" id="note" role="status" aria-live="polite">
+            Натисніть «Роздати», щоб насипати монет.
+          </p>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <div class="ghost" id="ghost" hidden></div>
+
+  <div class="vault-overlay" id="ovStart">
+    <div class="vault-overlay__card">
+      <h2 class="vault-overlay__title">Таємниці скарбниці</h2>
+      <p class="vault-overlay__text">У скарбниці перемішалися монети. На кожній — історичне джерело: речове, усне, писемне чи візуальне. Монети не підписані кольором — вид джерела треба знати.</p>
+      <ul class="vault-list">
+        <li>Беріть верхню монету комірки (натисніть або перетягніть) і кладіть на монету того самого виду джерела або в порожню комірку.</li>
+        <li>Правильна пара фарбується в колір свого виду, і далі пофарбований стос переноситься цілим. Хибна монета відскакує.</li>
+        <li>Шість пофарбованих монет одного виду поспіль перетворюються на дві монети наступного виду: +10 очок. Мета — 30 очок.</li>
+        <li>Забракло місця — «Роздати» доповнить комірки. «?» відкривається, щойно опиниться нагорі.</li>
+      </ul>
+      <button class="button" id="startBtn" type="button">Відчинити скарбницю</button>
+    </div>
+  </div>
+
+  <div class="vault-overlay" id="ovEnd" hidden>
+    <div class="vault-overlay__card">
+      <h2 class="vault-overlay__title" id="endTitle">Скарбницю впорядковано</h2>
+      <p class="vault-overlay__text" id="endRating"></p>
+      <p class="vault-overlay__text" id="endStats"></p>
+      <p class="vault-overlay__text" id="endCoins"></p>
+      <div id="endMistakesBox" hidden>
+        <p class="vault-overlay__text"><b>Варто перечитати:</b></p>
+        <ul class="vault-list" id="endMistakes"></ul>
+      </div>
+      <div class="rating" id="rateSlot"></div>
+      <div class="vault-overlay__buttons">
+        <button class="button" id="againBtn" type="button">Нова скарбниця</button>
+        <a class="button button--quiet" href="../index.html">На головну</a>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- «Архів»: візит сторінки й сесії гри (shared/js/analytics.js). -->
+<script src="../shared/js/analytics.js"></script>
+<script src="../data/arcade/skarbnytsia.js"></script>
+<script src="../data/games-registry.js"></script>
+<script src="../shared/js/wallet.js"></script>
+<script src="skarbnytsia/game.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var data = window.SKARBNYTSIA_DATA;
+  function $(id) { return document.getElementById(id); }
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) { node.className = className; }
+    if (text !== undefined && text !== null) { node.textContent = String(text); }
+    return node;
+  }
+
+  if (!data || !window.Skarbnytsia) {
+    $('errorSlot').appendChild(el('p', 'status',
+      'Не вдалося завантажити гру: бракує data/arcade/skarbnytsia.js або skarbnytsia/game.js.'));
+    $('game').hidden = true;
+    $('ovStart').hidden = true;
+    return;
+  }
+
+  /* id гри — той самий у гаманці й аналітиці (CLAUDE.md: «registry id = moduleId»). */
+  var match = /[?&]game=([^&#]*)/.exec(window.location.search);
+  var gameId = match ? decodeURIComponent(match[1]) : data.topic + ':skarbnytsia';
+  var checksOk = 0;
+  var mistakes = {};
+  var sessionOpen = false;
+
+  function plural(n, forms) {
+    var a = Math.abs(n) % 100, b = a % 10;
+    if (a > 10 && a < 20) { return forms[2]; }
+    if (b > 1 && b < 5) { return forms[1]; }
+    if (b === 1) { return forms[0]; }
+    return forms[2];
+  }
+
+  function note(kind, text) {
+    if (kind) { $('note').setAttribute('data-kind', kind); } else { $('note').removeAttribute('data-kind'); }
+    $('note').textContent = text;
+  }
+
+  function catOf(id) {
+    for (var i = 0; i < data.categories.length; i++) {
+      if (data.categories[i].id === id) { return data.categories[i]; }
+    }
+    return null;
+  }
+
+  data.categories.forEach(function (c) {
+    var row = el('div', 'legend__row');
+    var dot = el('span', 'legend__dot');
+    dot.style.setProperty('--coin', c.color);
+    row.appendChild(dot);
+    var text = el('span');
+    text.appendChild(el('b', null, c.name));
+    text.appendChild(el('span', 'legend__hint', ' — ' + c.hint));
+    row.appendChild(text);
+    $('legend').appendChild(row);
+  });
+  $('target').textContent = String(data.winScore);
+
+  Skarbnytsia.init({
+    data: data,
+    gridId: 'cells',
+    ghostId: 'ghost',
+
+    /* Факт після кожної перевірки — і правильної, і хибної
+       (docs/review-evidence.md, п. 1). Порожня комірка нічого не перевіряє. */
+    onMove: function (info) {
+      if (!info.target) { note(null, 'Покладено в порожню комірку. Перевірка — коли покладете монету на монету.'); return; }
+      var cat = catOf(info.coins[0].cat);
+      var label = info.coins[0].label;
+      if (info.ok) {
+        checksOk += 1;
+        note('ok', '✓ «' + label + '» — ' + cat.one + ' джерело: ' + cat.hint + '.');
+      } else {
+        note('bad', '✗ «' + label + '» — ' + cat.one + ' джерело (' + cat.hint
+          + '), а «' + info.targetCoin.label + '» — ' + info.target.one + '.');
+        mistakes[label] = '«' + label + '» — ' + cat.one + ' джерело: ' + cat.hint + '.';
+      }
+      if (window.HLGAnalytics) { HLGAnalytics.answer(cat.req, info.ok); }
+    },
+
+    onConvert: function (info) {
+      note('ok', '✨ Шість монет «' + info.from.name + '» перетворилися на монети «' + info.to.name + '». +10 очок.');
+    },
+
+    onFull: function () {
+      note('bad', 'У цій комірці не вистачить місця.');
+    },
+
+    onChange: function (st) {
+      $('score').textContent = String(st.score);
+      $('mistakes').textContent = String(st.mistakes);
+      $('chain').textContent = st.order.map(function (c) { return c.name; }).join(' → ') + ' → '
+        + st.order[0].name;
+    },
+
+    onFinish: function (r) {
+      var total = checksOk + r.mistakes;
+      var ratio = total ? checksOk / total : 0;
+      var text = '';
+      for (var i = 0; i < data.ratings.length; i++) {
+        if (ratio >= data.ratings[i].min) { text = data.ratings[i].text; break; }
+      }
+      $('endTitle').textContent = r.won ? 'Скарбницю впорядковано' : 'Скарбницю зачинено';
+      $('endRating').textContent = r.won ? text : 'До мети ' + data.winScore + ' очок не дійшли — спробуйте ще.';
+      $('endStats').textContent = 'Очки: ' + r.score + ' з ' + data.winScore
+        + ', правильних пар: ' + checksOk + ', відскочило: ' + r.mistakes
+        + ', перетворень: ' + r.conversions + ', час: ' + r.seconds + ' с.';
+
+      /* Монети — шкалою за влучністю, але лише коли мету досягнуто:
+         інакше дві вдалі пари й «Завершити» давали б 100 %. */
+      var gained = 0;
+      if (window.HLGWallet) {
+        gained = HLGWallet.award(gameId, { score: r.won ? checksOk : 0, total: Math.max(total, 1) });
+      }
+      $('endCoins').textContent = gained
+        ? '+' + gained + ' ' + plural(gained, ['монета', 'монети', 'монет']) + '.'
+        : 'Монет не нараховано: потрібно набрати ' + data.winScore + ' очок, і щоб щонайменше 70 % пар були правильними.';
+
+      var list = $('endMistakes');
+      while (list.firstChild) { list.removeChild(list.firstChild); }
+      Object.keys(mistakes).forEach(function (k) { list.appendChild(el('li', null, mistakes[k])); });
+      $('endMistakesBox').hidden = Object.keys(mistakes).length === 0;
+
+      if (window.HLGAnalytics && sessionOpen) {
+        HLGAnalytics.endSession({ score: r.won ? checksOk : 0, total: Math.max(total, 1), won: r.won, attempts: 1 });
+        sessionOpen = false;
+      }
+      if (window.HLGAnalytics) { HLGAnalytics.renderRating('rateSlot', gameId); }
+      $('ovEnd').hidden = false;
+    }
+  });
+
+  function begin() {
+    checksOk = 0;
+    mistakes = {};
+    note(null, 'Натисніть «Роздати», щоб насипати монет.');
+    if (window.HLGAnalytics) { HLGAnalytics.startSession(gameId); sessionOpen = true; }
+    $('ovStart').hidden = true;
+    $('ovEnd').hidden = true;
+    Skarbnytsia.start();
+    Skarbnytsia.deal();
+    note(null, 'Беріть верхню монету й кладіть на монету того самого виду джерела.');
+  }
+
+  $('dealBtn').addEventListener('click', function () {
+    var added = Skarbnytsia.deal();
+    note(null, added ? 'Додано ' + added + ' ' + plural(added, ['монету', 'монети', 'монет']) + '.'
+                     : 'Комірки й так повні наполовину — спершу розкладіть наявні монети.');
+  });
+  $('stopBtn').addEventListener('click', function () { Skarbnytsia.finish(); });
+  $('startBtn').addEventListener('click', begin);
+  $('againBtn').addEventListener('click', begin);
+  window.skarbnytsiaDebug = Skarbnytsia.debug;
+})();
+</script>
+</body>
+</html>
