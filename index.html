@@ -63,19 +63,13 @@
   <section class="hub__section">
     <h2 class="hub__section-title">(не)історична історія</h2>
     <div class="stories">
-      <a class="story" href="games/viraska.html">
-        <span class="story__title">Гетьманщина 1918</span>
+      <!-- Сцена «Гетьманщини 1918» зі шляхом data/narrative/vsia-istoriia.js.
+           Ланцюг «Шість частин» (games/neistorychna-1.html) з головної
+           прибрано 2026-11-22 — рішення куратора; сторінки лишаються на диску. -->
+      <a class="story" href="games/viraska.html?story=vsia-istoriia">
+        <span class="story__title">Вся історія</span>
         <span class="story__hint">
-          Шлях Міри крізь три випробування · без балів і монет
-        </span>
-      </a>
-
-      <!-- Ланцюг із шести частин. Тут навмисно ОДНЕ посилання, а не шість:
-           наступна частина відкривається лише з кінця попередньої. -->
-      <a class="story" href="games/neistorychna-1.html">
-        <span class="story__title">Шість частин</span>
-        <span class="story__hint">
-          Семінари 11–33 · 78 завдань Wordwall · далі — з кінця частини
+          Шлях Міри · семінар 11, 8 завдань Wordwall · без балів і монет
         </span>
       </a>
     </div>
@@ -367,10 +361,12 @@
   };
 
   /* Окремі посилання в блоці — ігри поза реєстром (як «Портрети» вище):
-     вони не розгортаються по темах, тож ключ — slug блоку з blocks.tsv. */
+     вони не розгортаються по темах, тож ключ — slug блоку з blocks.tsv.
+     Запис з id малюється кнопкою з квадратиком опанування (id — той самий,
+     що гра передає гаманцю через ?game=), без id — рядком-посиланням. */
   var BLOCK_LINKS = {
     'rus-ukraina': [
-      { href: 'games/try-v-riad.html?game=try-v-riad',
+      { id: 'try-v-riad', href: 'games/try-v-riad.html?game=try-v-riad',
         label: 'Три дати в ряд', text: 'дати тем 02–05, колір — тема' }
     ],
     kultura: [
@@ -390,15 +386,25 @@
       return published(link.href);
     });
     if (!links.length) { return null; }
-    var line = el('p', 'block__soon');
-    links.forEach(function (link, i) {
-      if (i) { line.appendChild(document.createTextNode(' · ')); }
+    var box = el('div', 'block__links');
+    var line = null;
+    links.forEach(function (link) {
+      if (link.id) {
+        var row = el('div', 'block__game');
+        row.appendChild(makeOpenButton(link.id, link.label, link.href,
+                                       link.label + ': ' + link.text));
+        row.appendChild(el('span', 'block__game-note', link.text));
+        box.appendChild(row);
+        return;
+      }
+      if (!line) { line = el('p', 'block__soon'); box.appendChild(line); }
+      else { line.appendChild(document.createTextNode(' · ')); }
       line.appendChild(el('b', null, link.label + ': '));
       var a = el('a', null, link.text);
       a.href = link.href;
       line.appendChild(a);
     });
-    return line;
+    return box;
   }
 
   function renderBlock(block) {

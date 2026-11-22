@@ -70,7 +70,7 @@
   function resize() {
     if (!canvas || !s) { return; }
     var box = canvas.parentNode.getBoundingClientRect();
-    var w = Math.max(240, Math.min(box.width, 600));
+    var w = Math.max(240, Math.min(box.width, 920));
     size.cell = Math.floor(w / s.cols);
     size.w = size.cell * s.cols;
     size.h = size.cell * s.rows;

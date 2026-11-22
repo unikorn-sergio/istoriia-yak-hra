@@ -361,6 +361,25 @@
   font-weight: 600;
 }
 
+/* Гра блоку поза реєстром: кнопка, як у тем, і підпис поруч. */
+.block__links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.block__game {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.block__game-note {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
 /* --- рядок стану ------------------------------------------------------------- */
 
 .hub__status {

@@ -55,8 +55,8 @@
 
 <main class="page page--game viraska">
   <header class="page__header">
-    <h1 class="page__title">Гетьманщина 1918</h1>
-    <p class="page__meta">
+    <h1 class="page__title" id="storyTitle">Гетьманщина 1918</h1>
+    <p class="page__meta" id="storyMeta">
       Шлях Міри крізь три випробування. Ця гра нічого не оцінює й не платить
       монет — вона розповідає, а не перевіряє.
     </p>
@@ -116,6 +116,7 @@
 <!-- «Архів»: візит сторінки й сесії гри (shared/js/analytics.js). -->
 <script src="../shared/js/analytics.js"></script>
 <script src="../data/narrative/viraska.js"></script>
+<script src="../data/narrative/vsia-istoriia.js"></script>
 <script src="viraska/stage.js"></script>
 
 <script>
@@ -123,6 +124,29 @@
   'use strict';
 
   var STORE_KEY = 'histgame_viraska';
+
+  /* ?story=<id> бере шлях із window.NARRATIVE_STORIES; чого в ньому немає
+     (сітка, резерв, голоси, спрайти, basePath) — позичає з VIRASKA_DATA,
+     тому сцена й ворог ті самі. Без ?story= — «Гетьманщина 1918». */
+  var storyId = (function () {
+    var m = /[?&]story=([^&#]+)/.exec(window.location.search);
+    return m ? decodeURIComponent(m[1]) : '';
+  })();
+  var DATA = (function () {
+    var base = window.VIRASKA_DATA;
+    var story = window.NARRATIVE_STORIES && window.NARRATIVE_STORIES[storyId];
+    if (!story) { storyId = ''; return base; }
+    var merged = {};
+    Object.keys(base).forEach(function (k) { merged[k] = base[k]; });
+    Object.keys(story).forEach(function (k) { merged[k] = story[k]; });
+    return merged;
+  })();
+  if (storyId) {
+    document.title = DATA.title + ' — Історія як гра';
+    document.body.setAttribute('data-game-title', DATA.title);
+    document.getElementById('storyTitle').textContent = DATA.title;
+    if (DATA.meta) { document.getElementById('storyMeta').textContent = DATA.meta; }
+  }
 
   var intro = document.getElementById('intro');
   var arena = document.getElementById('arena');
@@ -322,7 +346,7 @@
        прокрутки й змінює ширину — сітку треба рахувати вже після цього. */
     document.body.classList.add('is-arena');
 
-    var data = window.VIRASKA_DATA;
+    var data = DATA;
     if (withTasks) { buildScreens(data.locations); }
 
     var reserve = data.reserve || {};
@@ -345,7 +369,7 @@
   /* Аналітика — під перевіркою присутності: гра мусить працювати й без неї.
      ГАМАНЦЯ ТУТ НЕМАЄ І БУТИ НЕ МАЄ. Сторітелінг не перевіряє жодної навички
      НМТ, тому монет не платить — рішення куратора, а не забутий рядок. */
-  if (window.HLGAnalytics) { HLGAnalytics.startSession('viraska'); }
+  if (window.HLGAnalytics) { HLGAnalytics.startSession(storyId ? 'viraska:' + storyId : 'viraska'); }
 })();
 </script>
 
