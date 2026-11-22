@@ -7,20 +7,57 @@
 // тому ворог той самий: скелет, спрайти з набору `a1 enemy_*` в assets/
 // (копії в games/viraska/assets/enemy-*).
 //
-// Завдання — Wordwall першої теми набору: семінар 11 (Національно-визвольна
-// війна середини XVII ст., тема НМТ 08), вісім вбудувань із
-// «Wordwall посилання для html.md», у тому ж порядку.
+// --- Звідки завдання ----------------------------------------------------------
 //
-// Додати тему = дописати локації в кінець locations.
+// ЄДИНЕ джерело — репозиторій курсу:
+//   D:\Корн_новий\Робоча16_ЗНО-НМТ\Підготовчий курс_2026\Wordwall\
+//   «Семінар N — …, розподіл.md» (таблиця «Створені активності»)
+//   і «Семінар N_k — <шаблон>.md» (посилання й стан доступу).
+// Номер семінару = номер лекції у варіанті на 35 тем. Файли
+// «Wordwall посилання …» і «Wordwall 6 частин.md» у корені платформи —
+// старий набір (2025, семінари 11–33); сюди їх НЕ беремо.
+//
+// Кожне завдання має:
+//   resource  https://wordwall.net/resource/… — як у репозиторії курсу
+//   embed     адреса для <iframe> (https://wordwall.net/embed/<guid>?…).
+//             З'являється лише після Share у Wordwall, а Share натискає тільки
+//             автор. Поки embed порожній, сторінка показує заглушку з
+//             посиланням resource, і шлях Міри йде далі.
+//
+// Приватність: активності курсу містять зображення УЦОЯО / osvita.ua і
+// лишаються Private (правило курсу «Wordwall — алгоритми семінарів.md»,
+// розділ «Доступ і приватність»). Платформа має публічне видання
+// (tools/public-export.py) — перш ніж вписувати embed, вирішити, чи цей
+// шлях іде в публічне видання.
+//
+// Додати тему = дописати семінар у SEMINARS.
 
 (function () {
   'use strict';
 
   window.NARRATIVE_STORIES = window.NARRATIVE_STORIES || {};
 
-  function wordwall(id, query) {
-    return 'https://wordwall.net/embed/' + id + '?' + query + '&fontStackId=0';
-  }
+  var WW = 'https://wordwall.net/resource/';
+
+  /* Семінар 1 — демоваріант НМТ 2026; створено 08.11.2026, усі Private.
+     Порядок — як у таблиці «Створені активності» репозиторію курсу. */
+  var SEMINARS = [
+    {
+      n: 1,
+      tint: 'var(--block-1-bg)',
+      tasks: [
+        { code: '1_1', name: 'Картки', template: 'Flash cards', id: '123350120' },
+        { code: '1_2', name: 'Пара чи не пара', template: 'Pair or No Pair', id: '123332416' },
+        { code: '1_3', name: 'Групи', template: 'Group sort', id: '123350553' },
+        { code: '1_4.1', name: 'Порядок: Русь', template: 'Rank order', id: '123350636' },
+        { code: '1_4.2', name: 'Порядок: радянська доба', template: 'Rank order', id: '123350656' },
+        { code: '1_4.3', name: 'Порядок: плакати', template: 'Rank order', id: '123350807' },
+        { code: '1_5', name: 'Карта', template: 'Labelled diagram', id: '123350952' },
+        { code: '1_7', name: 'Упізнай зображення', template: 'Gameshow quiz', id: '123351207' },
+        { code: '1_8', name: 'Пропущені слова', template: 'Complete the sentence', id: '123351641' }
+      ]
+    }
+  ];
 
   /* Чотири доріжки по колу: низ → право, верх → ліво, змійка, підйом.
      Кожна має один пост ворога. */
@@ -51,34 +88,30 @@
     ]
   ];
 
-  var TASKS = [
-    { name: 'Січ, січень 1648', id: '531678c9395849b7b6425599ede5d8d5', q: 'themeId=52&templateId=25' },
-    { name: 'Жовті Води', id: '0bae8ec84a954655ac3b892703574386', q: 'themeId=22&templateId=45' },
-    { name: 'Корсунь', id: 'a3b72d1893e8478cb3328c38f77c6c41', q: 'themeId=46&templateId=48' },
-    { name: 'Пилявці', id: '5e00b481ccdd45ce842ef5ce36341cc0', q: 'themeId=1&templateId=22' },
-    { name: 'Зборів', id: 'b832e07a00e542768608bb9c9795eec1', q: 'themeId=44&templateId=73' },
-    { name: 'Берестечко', id: '512971572a604fc8855df420051df7ff', q: 'themeId=1&templateId=36' },
-    { name: 'Батіг', id: '81086c481a0a4fa3b43c666f54ea67e5', q: 'themeId=1&templateId=81' },
-    { name: 'Переяслав', id: '1c9835d21ba04c759f4466f273bf67f2', q: 'themeId=1&templateId=22' }
-  ];
+  var locations = [];
+  SEMINARS.forEach(function (sem) {
+    sem.tasks.forEach(function (t) {
+      locations.push({
+        id: 's' + t.code,
+        name: t.name,
+        tint: sem.tint,
+        path: PATHS[locations.length % PATHS.length],
+        task: {
+          label: 'Семінар ' + sem.n + ' · ' + t.code + ' ' + t.template,
+          resource: WW + t.id,
+          embed: t.embed || ''
+        },
+        next: 'Продовжити шлях'
+      });
+    });
+  });
+  if (locations.length) { locations[locations.length - 1].next = 'Завершити шлях'; }
 
   window.NARRATIVE_STORIES['vsia-istoriia'] = {
     title: 'Вся історія',
     meta: 'Шлях Міри крізь історію України, тема за темою. Перша — '
-      + 'Національно-визвольна війна середини XVII ст. Ця гра нічого не '
-      + 'оцінює й не платить монет — вона розповідає, а не перевіряє.',
-    locations: TASKS.map(function (t, i) {
-      return {
-        id: 's11-' + (i + 1),
-        name: t.name,
-        tint: 'var(--block-4-bg)',
-        path: PATHS[i % PATHS.length],
-        task: {
-          label: 'Семінар 11 · завдання ' + (i + 1) + ' з ' + TASKS.length,
-          embed: wordwall(t.id, t.q)
-        },
-        next: i === TASKS.length - 1 ? 'Завершити тему' : 'Продовжити шлях'
-      };
-    })
+      + 'демоваріант НМТ 2026. Ця гра нічого не оцінює й не платить монет — '
+      + 'вона розповідає, а не перевіряє.',
+    locations: locations
   };
 })();

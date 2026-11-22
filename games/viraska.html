@@ -233,6 +233,13 @@
     clear(screen.slot);
     if (screen.timer) { clearTimeout(screen.timer); screen.timer = null; }
 
+    /* Активність ще не поширена (Private у Wordwall): embed-коду немає,
+       є лише resource-посилання. Кадр не монтуємо — показуємо заглушку. */
+    if (!screen.task.embed) {
+      showUnshared(screen);
+      return;
+    }
+
     if (navigator.onLine === false) {
       showOffline(screen);
       return;
@@ -256,6 +263,22 @@
       screen.timer = null;
       showOffline(screen);
     }, 8000);
+  }
+
+  function showUnshared(screen) {
+    clear(screen.slot);
+    var box = el('div', 'error-box');
+    box.appendChild(el('p', null,
+      (screen.task.label || 'Завдання') + ': вікно ще не відкрите для вбудовування. '
+      + 'Шлях Міри це не зупиняє — тисніть «Продовжити шлях».'));
+    if (screen.task.resource) {
+      var link = el('a', 'button button--quiet', 'Відкрити на Wordwall');
+      link.href = screen.task.resource;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      box.appendChild(link);
+    }
+    screen.slot.appendChild(box);
   }
 
   function showOffline(screen) {

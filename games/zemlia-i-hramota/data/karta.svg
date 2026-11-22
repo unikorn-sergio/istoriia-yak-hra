@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 692">
+<!-- Власна декоративна карта гри «Земля і грамота». Обриси — наближення від руки, не атлас. -->
+<defs>
+  <radialGradient id="parch" cx="50%" cy="45%" r="75%">
+    <stop offset="0" stop-color="#f7ebcd"/><stop offset="0.7" stop-color="#ead6a6"/><stop offset="1" stop-color="#c9a76a"/>
+  </radialGradient>
+  <pattern id="waves" width="40" height="18" patternUnits="userSpaceOnUse">
+    <path d="M0,9 q10,-7 20,0 t20,0" fill="none" stroke="#7fa3a8" stroke-width="1.2" opacity="0.55"/>
+  </pattern>
+  <pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
+    <line x1="0" y1="0" x2="0" y2="9" stroke="#b89a5f" stroke-width="1" opacity="0.35"/>
+  </pattern>
+  <filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale="5"/></filter>
+</defs>
+<rect width="1000" height="692" fill="url(#parch)"/>
+<rect width="1000" height="692" fill="#9cc0c2" opacity="0.18"/>
+<path d="M0,540 Q300,498 500,567 T1000,512 L1000,692 L0,692 Z" fill="#a9c7c6" opacity="0.55"/>
+<rect width="1000" height="692" fill="url(#waves)" opacity="0.6"/>
+<g filter="url(#rough)">
+  <path d="M104.2,102.2 L125.0,90.4 L192.7,66.8 L281.2,94.4 L343.7,94.4 L401.0,110.1 L468.8,118.0 L484.4,55.0 L531.3,55.0 L604.2,35.4 L651.0,86.5 L666.7,121.9 L718.8,173.0 L755.2,188.7 L822.9,188.7 L864.6,220.2 L916.7,235.9 L963.5,251.6 L958.3,306.7 L942.7,377.5 L947.9,393.2 L864.6,448.2 L802.1,460.0 L739.6,487.5 L687.5,519.0 L713.5,566.2 L776.0,578.0 L718.8,609.4 L666.7,648.8 L619.8,648.8 L567.7,581.9 L625.0,542.6 L630.2,519.0 L541.7,495.4 L515.6,487.5 L474.0,499.3 L447.9,546.5 L421.9,589.8 L346.4,578.0 L364.6,526.9 L382.8,491.5 L434.9,499.3 L442.7,467.9 L416.7,408.9 L380.2,373.5 L338.5,353.9 L281.2,346.0 L260.4,357.8 L177.1,385.3 L135.4,385.3 L83.3,373.5 L52.1,369.6 L28.6,346.0 L52.1,291.0 L57.3,251.6 L99.0,196.6 L130.2,157.3 Z" fill="#f1e2b8" stroke="#8a6a38" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M104.2,102.2 L125.0,90.4 L192.7,66.8 L281.2,94.4 L343.7,94.4 L401.0,110.1 L468.8,118.0 L484.4,55.0 L531.3,55.0 L604.2,35.4 L651.0,86.5 L666.7,121.9 L718.8,173.0 L755.2,188.7 L822.9,188.7 L864.6,220.2 L916.7,235.9 L963.5,251.6 L958.3,306.7 L942.7,377.5 L947.9,393.2 L864.6,448.2 L802.1,460.0 L739.6,487.5 L687.5,519.0 L713.5,566.2 L776.0,578.0 L718.8,609.4 L666.7,648.8 L619.8,648.8 L567.7,581.9 L625.0,542.6 L630.2,519.0 L541.7,495.4 L515.6,487.5 L474.0,499.3 L447.9,546.5 L421.9,589.8 L346.4,578.0 L364.6,526.9 L382.8,491.5 L434.9,499.3 L442.7,467.9 L416.7,408.9 L380.2,373.5 L338.5,353.9 L281.2,346.0 L260.4,357.8 L177.1,385.3 L135.4,385.3 L83.3,373.5 L52.1,369.6 L28.6,346.0 L52.1,291.0 L57.3,251.6 L99.0,196.6 L130.2,157.3 Z" fill="url(#hatch)"/>
+</g>
+<path d="M51.5,355.9 l11,-20 l11,20" fill="#c9b07c" stroke="#7a5a2e" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M60.5,343.9 l5,-9" stroke="#fff6dc" stroke-width="2"/>
+<path d="M72.3,376.5 l11,-20 l11,20" fill="#c9b07c" stroke="#7a5a2e" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M81.3,364.5 l5,-9" stroke="#fff6dc" stroke-width="2"/>
+<path d="M93.2,365.0 l11,-20 l11,20" fill="#c9b07c" stroke="#7a5a2e" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M102.2,353.0 l5,-9" stroke="#fff6dc" stroke-width="2"/>
+<path d="M114.0,385.6 l11,-20 l11,20" fill="#c9b07c" stroke="#7a5a2e" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M123.0,373.6 l5,-9" stroke="#fff6dc" stroke-width="2"/>
+<path d="M134.8,374.2 l11,-20 l11,20" fill="#c9b07c" stroke="#7a5a2e" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M143.8,362.2 l5,-9" stroke="#fff6dc" stroke-width="2"/>
+<path d="M155.7,394.8 l11,-20 l11,20" fill="#c9b07c" stroke="#7a5a2e" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M164.7,382.8 l5,-9" stroke="#fff6dc" stroke-width="2"/>
+<path d="M176.5,383.4 l11,-20 l11,20" fill="#c9b07c" stroke="#7a5a2e" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M185.5,371.4 l5,-9" stroke="#fff6dc" stroke-width="2"/>
+<g fill="none" stroke="#5f93a6" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M468.8,31.5 C467.9,45.9 464.0,92.4 463.5,118.0 C463.1,143.5 457.5,165.1 466.1,184.8 C474.8,204.5 498.7,220.8 515.6,235.9 C532.6,251.0 551.2,265.7 567.7,275.2 C584.2,284.8 596.4,282.8 614.6,293.3 C632.8,303.8 662.8,330.0 677.1,338.1 C691.4,346.3 695.7,333.5 700.5,342.1 C705.3,350.6 712.2,375.5 705.7,389.2 C699.2,403.0 676.6,410.9 661.5,424.6 C646.3,438.4 629.3,461.6 614.6,471.8 C599.8,482.0 585.9,483.4 572.9,486.0 C559.9,488.6 542.5,487.3 536.5,487.5" stroke-width="7" opacity="0.85"/>
+  <path d="M619.8,39.3 C611.1,47.2 586.8,76.0 567.7,86.5 C548.6,97.0 521.7,87.8 505.2,102.2 C488.7,116.6 474.8,161.2 468.8,173.0" stroke-width="4" opacity="0.8"/>
+  <path d="M72.9,263.4 C87.7,268.0 136.3,280.5 161.5,291.0 C186.6,301.4 204.0,318.5 224.0,326.3 C243.9,334.2 258.7,329.0 281.2,338.1 C303.8,347.3 337.7,361.1 359.4,381.4 C381.1,401.7 396.7,438.4 411.5,460.0 C426.2,481.6 441.8,502.6 447.9,511.1" stroke-width="5" opacity="0.8"/>
+  <path d="M307.3,228.0 C316.0,236.6 337.7,258.2 359.4,279.2 C381.1,300.1 415.8,332.2 437.5,353.9 C459.2,375.5 473.1,387.3 489.6,408.9 C506.1,430.5 528.6,471.2 536.5,483.6" stroke-width="4" opacity="0.75"/>
+</g>
+<g font-family="Georgia,'Times New Roman',serif" fill="#4c6f7c" font-style="italic">
+  <text x="531" y="224" font-size="20" transform="rotate(28 531 224)">Дніпро</text>
+  <text x="313" y="358" font-size="17" transform="rotate(18 313 358)">Дністер</text>
+  <text x="469" y="621" font-size="30" letter-spacing="6">Чорне море</text>
+  <text x="781" y="511" font-size="17">Азовське море</text>
+</g>
+<text x="89" y="413" font-family="Georgia,serif" font-size="16" fill="#7a5a2e" font-style="italic">Карпати</text>
+<path d="M891.7,117.6 L900.0,65.6 L900.0,117.6 Z" fill="#7a5a2e" opacity="0.85"/>
+<path d="M908.3,117.6 L900.0,65.6 L900.0,117.6 Z" fill="#e9d6a8" opacity="0.9"/>
+<path d="M895.6,113.2 L922.8,94.8 L900.0,117.6 Z" fill="#7a5a2e" opacity="0.6"/>
+<path d="M904.4,122.1 L922.8,94.8 L900.0,117.6 Z" fill="#e9d6a8" opacity="0.9"/>
+<path d="M900.0,109.3 L952.0,117.6 L900.0,117.6 Z" fill="#7a5a2e" opacity="0.85"/>
+<path d="M900.0,126.0 L952.0,117.6 L900.0,117.6 Z" fill="#e9d6a8" opacity="0.9"/>
+<path d="M904.4,113.2 L922.8,140.4 L900.0,117.6 Z" fill="#7a5a2e" opacity="0.6"/>
+<path d="M895.6,122.1 L922.8,140.4 L900.0,117.6 Z" fill="#e9d6a8" opacity="0.9"/>
+<path d="M908.3,117.6 L900.0,169.6 L900.0,117.6 Z" fill="#7a5a2e" opacity="0.85"/>
+<path d="M891.7,117.6 L900.0,169.6 L900.0,117.6 Z" fill="#e9d6a8" opacity="0.9"/>
+<path d="M904.4,122.1 L877.2,140.4 L900.0,117.6 Z" fill="#7a5a2e" opacity="0.6"/>
+<path d="M895.6,113.2 L877.2,140.4 L900.0,117.6 Z" fill="#e9d6a8" opacity="0.9"/>
+<path d="M900.0,126.0 L848.0,117.6 L900.0,117.6 Z" fill="#7a5a2e" opacity="0.85"/>
+<path d="M900.0,109.3 L848.0,117.6 L900.0,117.6 Z" fill="#e9d6a8" opacity="0.9"/>
+<path d="M895.6,122.1 L877.2,94.8 L900.0,117.6 Z" fill="#7a5a2e" opacity="0.6"/>
+<path d="M904.4,113.2 L877.2,94.8 L900.0,117.6 Z" fill="#e9d6a8" opacity="0.9"/>
+<circle cx="900.0" cy="117.6" r="16.6" fill="none" stroke="#7a5a2e" stroke-width="1.5" opacity="0.7"/>
+<text x="900.0" y="57.6" font-family="Georgia,serif" font-size="22" text-anchor="middle" fill="#5a3f1c">Пн</text>
+<g transform="translate(35,581)">
+  <rect x="0" y="0" width="250" height="76" rx="8" fill="#f7ebcd" stroke="#7a5a2e" stroke-width="2.5"/>
+  <rect x="6" y="6" width="238" height="64" rx="5" fill="none" stroke="#b08a4e" stroke-width="1.2"/>
+  <text x="125" y="36" font-family="Georgia,serif" font-size="25" text-anchor="middle" fill="#4a3216">Земля і грамота</text>
+  <text x="125" y="58" font-family="Georgia,serif" font-size="13" text-anchor="middle" fill="#6b5130" font-style="italic">мапа гри · не атлас</text>
+</g>
+<rect x="6" y="6" width="988" height="680" fill="none" stroke="#7a5a2e" stroke-width="4"/>
+<rect x="14" y="14" width="972" height="664" fill="none" stroke="#b08a4e" stroke-width="1.5"/>
+</svg>

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Земля і грамота — настільна гра з історії України</title>
+<link rel="icon" href="data:,">
+<!-- ЗГЕНЕРОВАНО tools/nastilna-sync.py з ../настільна-гра/index.html.
+     Руками не правити: правка — у джерелі, потім скрипт. -->
+<script>
+  /* FOUC-guard платформи (docs/head-fragment.html). reset.css і theme.css
+     НЕ підключено: гра несе власну копію токенів (board.css) і темної теми
+     не має — theme.css перефарбував би текст, а тло карток лишилося б світлим. */
+  (function () {
+    'use strict';
+    try {
+      var root = document.documentElement;
+      if (localStorage.getItem('histgame_theme') === 'dark') {
+        root.setAttribute('data-theme-dark', '1');
+      }
+      var size = localStorage.getItem('histgame_fontsize');
+      if (size === 'lg') { root.classList.add('font-lg'); }
+      if (size === 'xl') { root.classList.add('font-xl'); }
+      if (localStorage.getItem('histgame_reducemotion') === '1') {
+        root.classList.add('reduce-motion');
+      }
+      if (localStorage.getItem('histgame_highcontrast') === '1') {
+        root.classList.add('high-contrast');
+      }
+    } catch (e) {
+      /* приватний режим або вимкнений localStorage — типова тема */
+    }
+  })();
+</script>
+<link rel="stylesheet" href="css/board.css">
+</head>
+<body>
+
+<p id="storeNote" class="warn store-note" hidden>Браузер не дає зберігати стан: гра працює, але після перезавантаження сторінки партію не відновити.</p>
+
+<!-- Екран 1: налаштування -->
+<section id="screenSetup" class="screen setup">
+  <header class="setup-head">
+    <h1>Земля і грамота</h1>
+    <p class="msg-soft"><a href="../../index.html">← На головну</a> · гра для 2–4 команд на одному екрані, без монет платформи</p>
+    <p class="msg-soft">Настільна гра з історії України для 2–4 команд на одному екрані. Шаблон: завдання й події замінюються одним файлом JSON.</p>
+  </header>
+
+  <div class="setup-grid">
+    <div class="setup-col">
+      <section class="card">
+        <h2>Набір завдань</h2>
+        <div id="dataInfo"></div>
+        <div class="actions">
+          <label class="btn btn-main file-btn">Завантажити файл гри (.json)
+            <input type="file" id="dataFile" accept=".json,application/json">
+          </label>
+          <button type="button" class="btn" id="dataSample">Завантажити зразок файлу</button>
+          <button type="button" class="btn" id="dataReset">Повернути зразковий набір</button>
+        </div>
+        <div id="dataErrors"></div>
+        <p class="msg-soft">Як скласти власний файл — <a href="docs/format.html">опис формату</a>, <a href="docs/instruktsiia-dlia-shi.txt">інструкція для ШІ</a>, <a href="docs/pamiatka.html">пам'ятка до пари</a>.</p>
+      </section>
+
+      <section class="card">
+        <h2>Команди</h2>
+        <p class="msg-soft">PIN необов'язковий. Якщо клацає лише ведучий — лиште поля порожніми, і хід почнеться однією кнопкою. Якщо команди ходять самі — кожна вводить свій PIN (від 3 знаків, прихований), і чужою фішкою вже не походиш.</p>
+        <label class="field">Кількість команд
+          <select id="teamCount">
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+          </select>
+        </label>
+        <div id="teamsBox"></div>
+        <label class="field">PIN ведучого (необов'язково): пропустити хід, повернути хід, завершити партію
+          <input type="password" id="hostPin" autocomplete="new-password">
+        </label>
+        <div class="field-row">
+          <label class="field">Хвилин на партію <input type="number" id="optTime" min="1" max="180"></label>
+          <label class="field">Кубиків
+            <select id="optDice"><option value="1">1</option><option value="2">2</option></select>
+          </label>
+        </div>
+        <ul id="startErr" class="err-list msg-bad"></ul>
+        <div class="actions"><button type="button" class="btn btn-main btn-big" id="startBtn">Почати партію</button></div>
+        <div id="resumeBox" class="resume" hidden></div>
+      </section>
+
+      <details class="card rules">
+        <summary>Правила коротко</summary>
+        <ul>
+          <li>Команда починає хід (якщо задано PIN — вводить його), кидає кубик, фішка рухається, спрацьовує клітинка.</li>
+          <li>Вільна земля: виконайте завдання її доби — тоді можна купити грамоту. Невдача: купити цього разу не можна, правильну відповідь гра не показує.</li>
+          <li>Чужа земля: сплатіть оренду або оскаржте її завданням — успіх зменшує оренду вдвічі.</li>
+          <li>Уся доба в одних руках — оренда подвійна; її землі можна укріпити (до двох рівнів).</li>
+          <li>Промисли купуються без завдання, оренда росте з кількістю промислів у власника.</li>
+          <li>Хроніка — справжня подія з наслідком; у подіях-рішеннях правильного варіанта немає, кожен має ціну.</li>
+          <li>Архів — завдання за винагороду. В'язниця (у зразку — Поруб) — вийти грамотою, викупом, завданням-послідовністю або дочекавшись.</li>
+          <li>Коли спливає час, поточний раунд доходить до кінця (кожна команда ходить однаково разів). Перемагає більший капітал: гроші плюс грамоти й укріплення.</li>
+        </ul>
+      </details>
+    </div>
+
+    <div class="setup-col">
+      <section class="card">
+        <h2>Дошка</h2>
+        <div id="preview" class="board"></div>
+      </section>
+    </div>
+  </div>
+</section>
+
+<!-- Екран 2: партія -->
+<section id="screenGame" class="screen game" hidden>
+  <div id="board" class="board"></div>
+  <aside class="panel">
+    <div class="panel-head">
+      <span id="round" class="round"></span>
+      <span id="timer" class="timer"></span>
+      <button type="button" class="btn btn-small" id="hostBtn">Ведучий</button>
+    </div>
+    <div id="hostBox" class="host" hidden></div>
+    <div id="teams" class="teams"></div>
+    <div id="stage" class="stage"></div>
+    <h3 class="log-head">Останнє</h3>
+    <ol id="log" class="log"></ol>
+  </aside>
+</section>
+
+<!-- Екран 3: фінал -->
+<section id="screenFinal" class="screen" hidden></section>
+
+<script src="../../shared/js/analytics.js"></script>
+<script>
+  (function () {
+    'use strict';
+    if (!window.HLGAnalytics || !window.MutationObserver) { return; }
+    var game = document.getElementById('screenGame');
+    var fin = document.getElementById('screenFinal');
+    var open = false;
+    new MutationObserver(function () {
+      if (!game.hidden && !open) { open = true; HLGAnalytics.startSession('zemlia-i-hramota'); }
+      if (!fin.hidden && open) { open = false; HLGAnalytics.endSession({ won: true }); }
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
+  })();
+</script>
+<script src="data/default-game.js"></script>
+<script src="js/data.js"></script>
+<script src="js/tasks.js"></script>
+<script src="js/game.js"></script>
+<script>
+  (function () {
+    'use strict';
+    try {
+      BoardGame.init({ setupId: 'screenSetup', gameId: 'screenGame', finalId: 'screenFinal' });
+    } catch (e) {
+      var p = document.createElement('pre');
+      p.className = 'fatal';
+      p.textContent = 'Гра не запустилася: ' + e.message;
+      document.body.insertBefore(p, document.body.firstChild);
+      throw e;
+    }
+  })();
+</script>
+</body>
+</html>
